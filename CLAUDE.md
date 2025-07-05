@@ -51,6 +51,12 @@ golangci-lint run ./...
 - **manager.go**: gopls process management, LSP client, and MCP tool handlers
 - **lsp.go**: LSP protocol types and gopls communication methods
 
+### Test Files
+
+- **lsp_test.go**: Tests LSP protocol parsing functions, response handling, and error cases
+- **manager_test.go**: Tests Manager lifecycle, thread safety, MCP tool handlers, and JSON marshaling
+- **main_test.go**: Tests application layer components like argument parsing and HTTP server setup
+
 ### Available MCP Tools
 
 1. **go_to_definition**: Navigate to symbol definitions
@@ -128,9 +134,43 @@ This project implements a Model Context Protocol server that interfaces with gop
 3. **MCP Tools**: Structured tools for Go language server features
 4. **Graceful Shutdown**: Proper cleanup of gopls processes
 
+## Testing
+
+### Testing Strategy
+
+The project uses Go's standard testing package with comprehensive unit tests covering all major functionality:
+
+- **Unit Tests Only**: No integration tests to avoid external dependencies
+- **Table-Driven Tests**: Multiple test cases with edge cases and error conditions
+- **Thread Safety**: Concurrent testing for Manager request ID generation
+- **Error Handling**: Comprehensive testing of error conditions and invalid inputs
+- **JSON Marshaling**: Validation of MCP parameter and result serialization
+
+### Test Coverage
+
+- **LSP Protocol Layer**: Response parsing, type conversion, and error handling
+- **Manager Component**: Lifecycle management, tool handlers, and thread safety
+- **Application Layer**: Command-line parsing, HTTP server setup, and component creation
+- **26 Total Tests**: All major functions and methods tested with success/error paths
+
+### Running Tests
+
+```bash
+# Run all tests with verbose output and no caching (recommended)
+go test ./... -v -count=1 -p 1
+
+# Run tests with coverage
+go test ./... -cover
+
+# Run specific test file
+go test -v lsp_test.go
+```
+
 ## Development Guidelines
 
 - Follow standard Go project structure as the codebase grows
 - Implement proper error handling for MCP communication
 - Consider adding configuration files for gopls integration settings
 - Add appropriate logging for debugging MCP interactions
+- Write tests for new functionality using the established patterns
+- Run tests and linter before committing changes
