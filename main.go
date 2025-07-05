@@ -2,28 +2,29 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 func main() {
-	// Get workspace path from environment or use current directory
-	workspacePath := os.Getenv("WORKSPACE_PATH")
-	if workspacePath == "" {
-		var err error
-		workspacePath, err = os.Getwd()
-		if err != nil {
-			log.Fatal("Failed to get current working directory:", err)
-		}
+	// Parse command line flags
+	workspacePath := flag.String("workspace", "", "Path to the Go workspace directory (required)")
+	flag.Parse()
+
+	// Validate that workspace path is provided
+	if *workspacePath == "" {
+		log.Fatal("Error: -workspace flag is required")
 	}
 
 	// Create gopls manager
-	goplsManager := NewManager(workspacePath)
+	goplsManager := NewManager(*workspacePath)
 
 	// Start gopls
 	ctx, cancel := context.WithCancel(context.Background())
@@ -40,11 +41,6 @@ func main() {
 
 	// Add gopls tools
 	server.AddTools(
-		mcp.NewServerTool[any, string](
-			"ping",
-			"Simple ping tool to test server connectivity",
-			handlePing,
-		),
 		goplsManager.CreateGoToDefinitionTool(),
 		goplsManager.CreateFindReferencesTool(),
 		goplsManager.CreateGetHoverTool(),
@@ -55,8 +51,9 @@ func main() {
 		return server
 	})
 
-	// Set up HTTP server
-	http.HandleFunc("/sse", handler.ServeHTTP)
+	// Set up HTTP server with mux
+	mux := http.NewServeMux()
+	mux.HandleFunc("/sse", handler.ServeHTTP)
 
 	// Handle graceful shutdown
 	go func() {
@@ -70,20 +67,18 @@ func main() {
 	}()
 
 	log.Printf("Starting gopls-mcp server on :8080")
-	log.Printf("Workspace path: %s", workspacePath)
+	log.Printf("Workspace path: %s", *workspacePath)
 	log.Printf("SSE endpoint available at: http://localhost:8080/sse")
 
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	httpServer := &http.Server{
+		Addr:         ":8080",
+		Handler:      mux,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	if err := httpServer.ListenAndServe(); err != nil {
 		log.Printf("Server failed to start: %v", err)
 	}
-}
-
-func handlePing(_ context.Context, _ *mcp.ServerSession, _ *mcp.CallToolParamsFor[any]) (*mcp.CallToolResultFor[string], error) {
-	return &mcp.CallToolResultFor[string]{
-		Content: []mcp.Content{
-			&mcp.TextContent{
-				Text: "pong",
-			},
-		},
-	}, nil
 }
