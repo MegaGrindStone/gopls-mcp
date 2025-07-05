@@ -27,7 +27,7 @@ All tools work with your existing Go workspace and leverage gopls for accurate, 
 
 ### Claude Code Integration (Recommended)
 
-The easiest way to use gopls-mcp is with Claude Code using streamable HTTP transport:
+The easiest way to use gopls-mcp is with Claude Code using Streamable HTTP transport:
 
 1. **Start the server** with your Go workspace:
 
@@ -70,7 +70,7 @@ For Claude Desktop, add this to your MCP settings:
 
 ### Other MCP Hosts
 
-For VS Code and other MCP hosts, use the HTTP transport:
+For VS Code and other MCP hosts, use the Streamable HTTP transport:
 
 ```json
 {
@@ -136,7 +136,70 @@ The MCP server will automatically use the appropriate tool based on your request
 ### Server Options
 
 - **`-workspace`** (required): Path to your Go workspace directory
-- **Port**: Fixed at 8080
+- **`-transport`** (optional): Transport type, accepts 'http' or 'stdio' (defaults to 'http')
+- **Port**: Fixed at 8080 (Streamable HTTP transport only)
+
+### Transport Options
+
+#### Streamable HTTP Transport (Default)
+
+```bash
+# Start with Streamable HTTP transport (default)
+./gopls-mcp -workspace /path/to/go/project
+./gopls-mcp -workspace /path/to/go/project -transport http
+
+# Docker with Streamable HTTP transport
+docker run -v /path/to/go/project:/workspace -p 8080:8080 megagrindstone/gopls-mcp:latest
+```
+
+#### Stdio Transport
+
+```bash
+# Start with stdio transport
+./gopls-mcp -workspace /path/to/go/project -transport stdio
+
+# Docker with stdio transport
+docker run -i -v /path/to/go/project:/workspace megagrindstone/gopls-mcp:latest -transport stdio
+```
+
+For Claude Desktop with stdio transport:
+
+```json
+{
+  "mcpServers": {
+    "gopls-mcp": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-v", "/path/to/your/go/project:/workspace",
+        "megagrindstone/gopls-mcp:latest",
+        "-transport", "stdio"
+      ]
+    }
+  }
+}
+```
+
+### Logging Configuration
+
+The server supports structured logging with configurable levels and formats via environment variables:
+
+#### Environment Variables
+
+- **`LOG_LEVEL`**: Set logging level (DEBUG, INFO, WARN, ERROR) - defaults to INFO
+- **`LOG_FORMAT`**: Set log output format (text, json) - defaults to text
+
+#### Usage Examples
+
+```bash
+# Native with custom logging
+LOG_LEVEL=DEBUG ./gopls-mcp -workspace /path/to/go/project
+LOG_FORMAT=json LOG_LEVEL=WARN ./gopls-mcp -workspace /path/to/go/project
+
+# Docker with logging configuration
+docker run -e LOG_LEVEL=DEBUG -v /path/to/go/project:/workspace -p 8080:8080 megagrindstone/gopls-mcp:latest
+docker run -e LOG_FORMAT=json -e LOG_LEVEL=INFO -v /path/to/go/project:/workspace -p 8080:8080 megagrindstone/gopls-mcp:latest
+```
 
 ### Workspace Requirements
 
@@ -159,7 +222,7 @@ I maintain pre-built Docker images on Docker Hub with multi-platform support:
 docker pull megagrindstone/gopls-mcp:latest
 
 # Specific version
-docker pull megagrindstone/gopls-mcp:v0.1.0
+docker pull megagrindstone/gopls-mcp:v0.2.0
 
 # Run with your Go project
 docker run -v /path/to/go/project:/workspace -p 8080:8080 megagrindstone/gopls-mcp:latest
@@ -168,7 +231,7 @@ docker run -v /path/to/go/project:/workspace -p 8080:8080 megagrindstone/gopls-m
 ### Available Tags
 
 - `latest` - Latest stable release
-- `v*` - Semantic version tags (e.g., `v0.1.0`)
+- `v*` - Semantic version tags (e.g., `v0.2.0`)
 - `main` - Latest development build
 
 ### Multi-Platform Support
@@ -324,12 +387,17 @@ Get documentation and type information for symbols.
 To debug issues, run the server with verbose logging:
 
 ```bash
-# Native
-./gopls-mcp -workspace /path/to/project
+# Native with debug logging
+LOG_LEVEL=DEBUG ./gopls-mcp -workspace /path/to/project
 
-# Docker with logs
-docker run -v /path/to/project:/workspace -p 8080:8080 megagrindstone/gopls-mcp:latest
+# Docker with debug logging (Streamable HTTP)
+docker run -e LOG_LEVEL=DEBUG -v /path/to/project:/workspace -p 8080:8080 megagrindstone/gopls-mcp:latest
+
+# View Docker container logs
 docker logs <container-id>
+
+# JSON format logging for easier parsing
+docker run -e LOG_FORMAT=json -e LOG_LEVEL=DEBUG -v /path/to/project:/workspace -p 8080:8080 megagrindstone/gopls-mcp:latest
 ```
 
 ## Contributing
