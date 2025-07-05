@@ -214,6 +214,75 @@ The project is automatically built and published to Docker Hub at `megagrindston
 - **Health Check**: HTTP endpoint monitoring
 - **Dependencies**: gopls pre-installed
 
+## Architecture Improvements (2025-07-05)
+
+### LSP Communication Fix
+
+Fixed issue where the app would hang during gopls communication by implementing:
+
+1. **Continuous Message Reader**: Replaced single-shot response reading with a continuous reader goroutine that handles all LSP messages (responses, requests, notifications)
+
+2. **Proper Header Parsing**: Fixed parsing of LSP headers to correctly handle `\r\n` line endings and Content-Length extraction
+
+3. **Request-Response Correlation**: Implemented proper request ID tracking with response channels to match responses to their corresponding requests
+
+4. **Error Handling**: Added comprehensive error handling for LSP error responses and communication failures
+
+5. **Timeout Protection**: All LSP operations now have a 10-second timeout to prevent indefinite blocking
+
+6. **Stderr Monitoring**: Added goroutine to capture and log gopls stderr output for better debugging
+
+### Key Components Added
+
+- **messageReader()**: Continuous goroutine that reads all LSP messages from stdout
+- **sendRequestAndWait()**: Sends a request and waits for the correlated response with timeout
+- **routeResponse()**: Routes responses to waiting request handlers by ID
+- **readLSPMessage()**: Reads a complete LSP message (headers + content)
+- **handleLSPMessage()**: Routes messages based on type (response/request/notification)
+
+### File Management Fix (2025-07-05)
+
+Added automatic file opening to fix the issue where tools would hang waiting for gopls responses:
+
+1. **ensureFileOpen()**: Automatically opens files in gopls via `textDocument/didOpen` before making requests
+2. **File Tracking**: Tracks which files are already open to avoid duplicate `didOpen` notifications
+3. **Content Reading**: Reads file content from disk and sends it to gopls with proper language detection
+4. **Language Detection**: Automatically detects Go files (.go), go.mod files, and go.sum files
+
+**How it Works**: Before making any LSP request (go to definition, find references, hover), the system now:
+- Checks if the file is already open in gopls
+- If not, reads the file content from disk
+- Sends a `textDocument/didOpen` notification with the file content
+- Marks the file as open to avoid duplicate notifications
+- Then proceeds with the original LSP request
+
+This ensures gopls has the necessary file context to provide accurate analysis results.
+
+### Workspace Readiness and Timeout Fix (2025-07-05)
+
+Added workspace readiness tracking and increased timeouts to handle large codebases:
+
+1. **Workspace Readiness Tracking**: 
+   - Monitors `window/showMessage` and `$/progress` notifications from gopls
+   - Waits for "Finished loading packages" message before allowing LSP requests
+   - Prevents requests from being sent before gopls is ready to handle them
+
+2. **Increased Timeouts**:
+   - Extended LSP request timeout from 10 seconds to 60 seconds for large codebases
+   - Added progress logging every 10 seconds to show request is still being processed
+   - Better error messages indicating when gopls might be processing large codebase
+
+3. **Enhanced Notification Handling**:
+   - Properly handles both `window/showMessage` and `$/progress` notification formats
+   - Tracks workspace initialization status throughout the session
+   - Provides clear logging when workspace becomes ready
+
+**How it Works**: 
+- After gopls initialization, the system waits for workspace readiness notifications
+- LSP requests are blocked until gopls sends "Finished loading packages" message
+- Once ready, requests are sent with 60-second timeout and progress logging
+- This ensures reliable operation even with large Go projects that take time to index
+
 ## CI/CD Pipeline
 
 ### GitHub Actions Workflow

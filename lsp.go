@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 )
 
 // Position represents a position in a document.
@@ -53,8 +54,15 @@ type Hover struct {
 
 // GoToDefinition sends a textDocument/definition request to gopls.
 func (m *Manager) GoToDefinition(_ context.Context, uri string, line, character int) ([]Location, error) {
+	log.Printf("GoToDefinition called: uri=%s, line=%d, char=%d", uri, line, character)
+
 	if !m.IsRunning() {
 		return nil, fmt.Errorf("gopls is not running")
+	}
+
+	// Ensure file is open in gopls
+	if err := m.ensureFileOpen(uri); err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
 	}
 
 	request := map[string]any{
@@ -70,13 +78,9 @@ func (m *Manager) GoToDefinition(_ context.Context, uri string, line, character 
 		},
 	}
 
-	if err := m.sendRequest(request); err != nil {
-		return nil, fmt.Errorf("failed to send definition request: %w", err)
-	}
-
-	response, err := m.readResponse()
+	response, err := m.sendRequestAndWait(request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read definition response: %w", err)
+		return nil, fmt.Errorf("failed to get definition: %w", err)
 	}
 
 	// Extract locations from response
@@ -90,8 +94,15 @@ func (m *Manager) FindReferences(
 	line, character int,
 	includeDeclaration bool,
 ) ([]Location, error) {
+	log.Printf("FindReferences called: uri=%s, line=%d, char=%d, includeDecl=%v", uri, line, character, includeDeclaration)
+
 	if !m.IsRunning() {
 		return nil, fmt.Errorf("gopls is not running")
+	}
+
+	// Ensure file is open in gopls
+	if err := m.ensureFileOpen(uri); err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
 	}
 
 	request := map[string]any{
@@ -112,13 +123,9 @@ func (m *Manager) FindReferences(
 		},
 	}
 
-	if err := m.sendRequest(request); err != nil {
-		return nil, fmt.Errorf("failed to send references request: %w", err)
-	}
-
-	response, err := m.readResponse()
+	response, err := m.sendRequestAndWait(request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read references response: %w", err)
+		return nil, fmt.Errorf("failed to find references: %w", err)
 	}
 
 	// Extract locations from response
@@ -127,8 +134,15 @@ func (m *Manager) FindReferences(
 
 // GetHover sends a textDocument/hover request to gopls.
 func (m *Manager) GetHover(_ context.Context, uri string, line, character int) (*Hover, error) {
+	log.Printf("GetHover called: uri=%s, line=%d, char=%d", uri, line, character)
+
 	if !m.IsRunning() {
 		return nil, fmt.Errorf("gopls is not running")
+	}
+
+	// Ensure file is open in gopls
+	if err := m.ensureFileOpen(uri); err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
 	}
 
 	request := map[string]any{
@@ -144,13 +158,9 @@ func (m *Manager) GetHover(_ context.Context, uri string, line, character int) (
 		},
 	}
 
-	if err := m.sendRequest(request); err != nil {
-		return nil, fmt.Errorf("failed to send hover request: %w", err)
-	}
-
-	response, err := m.readResponse()
+	response, err := m.sendRequestAndWait(request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read hover response: %w", err)
+		return nil, fmt.Errorf("failed to get hover info: %w", err)
 	}
 
 	// Extract hover information from response

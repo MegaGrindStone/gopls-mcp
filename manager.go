@@ -6,29 +6,43 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
+	"net/url"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // Manager manages a gopls subprocess and handles LSP communication.
 type Manager struct {
-	cmd           *exec.Cmd
-	stdin         io.WriteCloser
-	stdout        io.ReadCloser
-	stderr        io.ReadCloser
-	requestIDMux  sync.Mutex
-	requestID     int
-	workspacePath string
-	mu            sync.RWMutex
-	running       bool
+	cmd               *exec.Cmd
+	stdin             io.WriteCloser
+	stdout            io.ReadCloser
+	stderr            io.ReadCloser
+	requestIDMux      sync.Mutex
+	requestID         int
+	workspacePath     string
+	mu                sync.RWMutex
+	running           bool
+	responses         map[int]chan map[string]any
+	responsesMux      sync.Mutex
+	openFiles         map[string]bool
+	openFilesMux      sync.RWMutex
+	workspaceReady    bool
+	workspaceReadyMux sync.RWMutex
 }
 
 // NewManager creates a new gopls manager with the specified workspace path.
 func NewManager(workspacePath string) *Manager {
 	return &Manager{
 		workspacePath: workspacePath,
+		responses:     make(map[int]chan map[string]any),
+		openFiles:     make(map[string]bool),
 	}
 }
 
@@ -41,8 +55,8 @@ func (m *Manager) Start(ctx context.Context) error {
 		return fmt.Errorf("gopls is already running")
 	}
 
-	// Start gopls process
-	m.cmd = exec.CommandContext(ctx, "gopls", "serve")
+	// Start gopls process (it defaults to stdio mode)
+	m.cmd = exec.CommandContext(ctx, "gopls")
 
 	var err error
 	m.stdin, err = m.cmd.StdinPipe()
@@ -66,6 +80,23 @@ func (m *Manager) Start(ctx context.Context) error {
 
 	m.running = true
 
+	// Monitor stderr for gopls errors and logging
+	go func() {
+		scanner := bufio.NewScanner(m.stderr)
+		for scanner.Scan() {
+			log.Printf("gopls stderr: %s", scanner.Text())
+		}
+		if err := scanner.Err(); err != nil {
+			log.Printf("error reading gopls stderr: %v", err)
+		}
+	}()
+
+	// Start the continuous message reader
+	go m.messageReader()
+
+	// Give gopls a moment to start
+	time.Sleep(100 * time.Millisecond)
+
 	// Initialize gopls with workspace
 	if err := m.initialize(ctx); err != nil {
 		_ = m.Stop()
@@ -73,6 +104,282 @@ func (m *Manager) Start(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// messageReader continuously reads messages from gopls stdout.
+func (m *Manager) messageReader() {
+	reader := bufio.NewReader(m.stdout)
+
+	for m.running {
+		message, err := m.readLSPMessage(reader)
+		if err != nil {
+			if m.running {
+				log.Printf("Error reading LSP message: %v", err)
+			}
+			return
+		}
+
+		m.handleLSPMessage(message)
+	}
+}
+
+// readLSPMessage reads a single LSP message from the reader.
+func (m *Manager) readLSPMessage(reader *bufio.Reader) (map[string]any, error) {
+	// Read headers
+	headers, err := m.readLSPHeaders(reader)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get content length
+	contentLength, err := m.getContentLength(headers)
+	if err != nil {
+		return nil, err
+	}
+
+	// Read the content
+	content := make([]byte, contentLength)
+	if _, err := io.ReadFull(reader, content); err != nil {
+		return nil, fmt.Errorf("failed to read message content: %w", err)
+	}
+
+	// Parse the JSON
+	var message map[string]any
+	if err := json.Unmarshal(content, &message); err != nil {
+		return nil, fmt.Errorf("failed to parse LSP message: %w", err)
+	}
+
+	return message, nil
+}
+
+// readLSPHeaders reads LSP message headers until an empty line.
+func (m *Manager) readLSPHeaders(reader *bufio.Reader) (map[string]string, error) {
+	headers := make(map[string]string)
+
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			return nil, fmt.Errorf("failed to read header line: %w", err)
+		}
+
+		// Trim the line ending
+		line = strings.TrimSuffix(line, "\n")
+		line = strings.TrimSuffix(line, "\r")
+
+		// Empty line marks end of headers
+		if line == "" {
+			break
+		}
+
+		// Parse header
+		parts := strings.SplitN(line, ": ", 2)
+		if len(parts) == 2 {
+			headers[parts[0]] = parts[1]
+		}
+	}
+
+	return headers, nil
+}
+
+// getContentLength extracts and validates the Content-Length header.
+func (m *Manager) getContentLength(headers map[string]string) (int, error) {
+	contentLengthStr, ok := headers["Content-Length"]
+	if !ok {
+		return 0, fmt.Errorf("missing Content-Length header")
+	}
+
+	var contentLength int
+	if _, err := fmt.Sscanf(contentLengthStr, "%d", &contentLength); err != nil {
+		return 0, fmt.Errorf("invalid Content-Length: %s", contentLengthStr)
+	}
+
+	return contentLength, nil
+}
+
+// ensureFileOpen ensures a file is opened in gopls before making requests about it.
+func (m *Manager) ensureFileOpen(fileURI string) error {
+	// Wait for workspace to be ready before making any requests
+	if err := m.waitForWorkspaceReady(30 * time.Second); err != nil {
+		return fmt.Errorf("workspace not ready: %w", err)
+	}
+
+	// Check if file is already open
+	m.openFilesMux.RLock()
+	isOpen := m.openFiles[fileURI]
+	m.openFilesMux.RUnlock()
+
+	if isOpen {
+		return nil // File already open
+	}
+
+	// Parse URI to get file path
+	parsedURI, err := url.Parse(fileURI)
+	if err != nil {
+		return fmt.Errorf("invalid file URI: %w", err)
+	}
+
+	if parsedURI.Scheme != "file" {
+		return fmt.Errorf("unsupported URI scheme: %s", parsedURI.Scheme)
+	}
+
+	filePath := parsedURI.Path
+
+	// Read file content
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file %s: %w", filePath, err)
+	}
+
+	// Determine language ID based on file extension
+	languageID := "go" // Default to Go
+	ext := filepath.Ext(filePath)
+	switch ext {
+	case ".go":
+		languageID = "go"
+	case ".mod":
+		languageID = "go.mod"
+	case ".sum":
+		languageID = "go.sum"
+	}
+
+	// Send textDocument/didOpen notification
+	didOpenNotification := map[string]any{
+		"jsonrpc": "2.0",
+		"method":  "textDocument/didOpen",
+		"params": map[string]any{
+			"textDocument": map[string]any{
+				"uri":        fileURI,
+				"languageId": languageID,
+				"version":    1,
+				"text":       string(content),
+			},
+		},
+	}
+
+	if err := m.sendRequest(didOpenNotification); err != nil {
+		return fmt.Errorf("failed to send didOpen notification: %w", err)
+	}
+
+	// Mark file as open
+	m.openFilesMux.Lock()
+	m.openFiles[fileURI] = true
+	m.openFilesMux.Unlock()
+
+	log.Printf("Opened file in gopls: %s", fileURI)
+	return nil
+}
+
+// isWorkspaceReady returns true if gopls has finished loading packages.
+func (m *Manager) isWorkspaceReady() bool {
+	m.workspaceReadyMux.RLock()
+	defer m.workspaceReadyMux.RUnlock()
+	return m.workspaceReady
+}
+
+// setWorkspaceReady marks the workspace as ready.
+func (m *Manager) setWorkspaceReady() {
+	m.workspaceReadyMux.Lock()
+	defer m.workspaceReadyMux.Unlock()
+	if !m.workspaceReady {
+		m.workspaceReady = true
+		log.Printf("Workspace marked as ready for LSP requests")
+	}
+}
+
+// waitForWorkspaceReady waits until gopls has finished loading packages.
+func (m *Manager) waitForWorkspaceReady(timeout time.Duration) error {
+	if m.isWorkspaceReady() {
+		return nil
+	}
+
+	log.Printf("Waiting for gopls to finish loading packages...")
+
+	start := time.Now()
+	for time.Since(start) < timeout {
+		if m.isWorkspaceReady() {
+			return nil
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	return fmt.Errorf("timeout waiting for gopls workspace to be ready")
+}
+
+// handleLSPMessage routes an LSP message to the appropriate handler.
+func (m *Manager) handleLSPMessage(message map[string]any) {
+	id, hasID := message["id"]
+	method, hasMethod := message["method"]
+
+	switch {
+	case hasID && !hasMethod:
+		// This is a response to our request
+		if idFloat, isFloat := id.(float64); isFloat {
+			m.routeResponse(int(idFloat), message)
+		}
+	case hasID && hasMethod:
+		// This is a request from the server (we don't handle these yet)
+		log.Printf("Received request from gopls: %+v", message)
+	case hasMethod:
+		// This is a notification
+		log.Printf("Received notification from gopls: %+v", message)
+		if methodStr, ok := method.(string); ok {
+			m.handleNotification(methodStr, message)
+		}
+	}
+}
+
+// handleNotification processes notifications from gopls.
+func (m *Manager) handleNotification(method string, message map[string]any) {
+	switch method {
+	case "window/showMessage":
+		m.handleShowMessage(message)
+	case "$/progress":
+		m.handleProgress(message)
+	}
+}
+
+// handleShowMessage processes window/showMessage notifications.
+func (m *Manager) handleShowMessage(message map[string]any) {
+	params, paramsOK := message["params"].(map[string]any)
+	if !paramsOK {
+		return
+	}
+
+	messageText, msgOK := params["message"].(string)
+	if !msgOK {
+		return
+	}
+
+	if strings.Contains(messageText, "Finished loading packages") {
+		m.setWorkspaceReady()
+	}
+}
+
+// handleProgress processes $/progress notifications.
+func (m *Manager) handleProgress(message map[string]any) {
+	params, paramsOK := message["params"].(map[string]any)
+	if !paramsOK {
+		return
+	}
+
+	value, valueOK := params["value"].(map[string]any)
+	if !valueOK {
+		return
+	}
+
+	kind, kindOK := value["kind"].(string)
+	if !kindOK || kind != "end" {
+		return
+	}
+
+	messageText, msgOK := value["message"].(string)
+	if !msgOK {
+		return
+	}
+
+	if strings.Contains(messageText, "Finished loading packages") {
+		m.setWorkspaceReady()
+	}
 }
 
 // Stop stops the gopls subprocess.
@@ -126,12 +433,13 @@ func (m *Manager) nextRequestID() int {
 
 // initialize sends the LSP initialize request to gopls.
 func (m *Manager) initialize(_ context.Context) error {
+	requestID := m.nextRequestID()
 	initRequest := map[string]any{
 		"jsonrpc": "2.0",
-		"id":      m.nextRequestID(),
+		"id":      requestID,
 		"method":  "initialize",
 		"params": map[string]any{
-			"processId": nil,
+			"processId": os.Getpid(), // Use actual process ID instead of nil
 			"rootUri":   fmt.Sprintf("file://%s", m.workspacePath),
 			"capabilities": map[string]any{
 				"textDocument": map[string]any{
@@ -152,7 +460,34 @@ func (m *Manager) initialize(_ context.Context) error {
 		},
 	}
 
-	return m.sendRequest(initRequest)
+	// Send initialize request and wait for response
+	log.Printf("Sending initialize request with ID %d", requestID)
+	response, err := m.sendRequestAndWait(initRequest)
+	if err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+	log.Printf("Received initialize response: %+v", response)
+
+	// Log server capabilities for debugging
+	if result, ok := response["result"].(map[string]any); ok {
+		if capabilities, capOk := result["capabilities"]; capOk {
+			log.Printf("gopls server capabilities: %+v", capabilities)
+		}
+	}
+
+	// Send initialized notification (no response expected)
+	initializedNotification := map[string]any{
+		"jsonrpc": "2.0",
+		"method":  "initialized",
+		"params":  map[string]any{},
+	}
+
+	if err := m.sendRequest(initializedNotification); err != nil {
+		return fmt.Errorf("failed to send initialized notification: %w", err)
+	}
+
+	log.Printf("gopls initialized successfully")
+	return nil
 }
 
 // sendRequest sends a JSON-RPC request to gopls.
@@ -166,53 +501,109 @@ func (m *Manager) sendRequest(request map[string]any) error {
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
+	// Log outgoing request for debugging
+	if method, ok := request["method"].(string); ok {
+		log.Printf("Sending LSP request: %s (id: %v)", method, request["id"])
+		log.Printf("Request data: %s", string(data))
+	}
+
 	// LSP uses Content-Length header format
 	message := fmt.Sprintf("Content-Length: %d\r\n\r\n%s", len(data), data)
+	log.Printf("Full message being sent: %q", message)
 
 	_, err = m.stdin.Write([]byte(message))
 	if err != nil {
 		return fmt.Errorf("failed to write request: %w", err)
 	}
 
+	// Ensure the data is flushed
+	if flusher, ok := m.stdin.(interface{ Flush() error }); ok {
+		if err := flusher.Flush(); err != nil {
+			log.Printf("Warning: failed to flush stdin: %v", err)
+		}
+	}
+
 	return nil
 }
 
-// readResponse reads a JSON-RPC response from gopls.
-func (m *Manager) readResponse() (map[string]any, error) {
-	if !m.running {
-		return nil, fmt.Errorf("gopls is not running")
+// routeResponse routes a response to the appropriate request handler.
+func (m *Manager) routeResponse(id int, response map[string]any) {
+	m.responsesMux.Lock()
+	ch, ok := m.responses[id]
+	if ok {
+		delete(m.responses, id)
 	}
+	m.responsesMux.Unlock()
 
-	scanner := bufio.NewScanner(m.stdout)
-
-	// Read Content-Length header
-	var contentLength int
-	for scanner.Scan() {
-		line := scanner.Text()
-		if line == "" {
-			break
+	if ok {
+		select {
+		case ch <- response:
+			// Response delivered
+		default:
+			log.Printf("Warning: response channel full for request %d", id)
 		}
-		if _, err := fmt.Sscanf(line, "Content-Length: %d", &contentLength); err == nil {
-			break
+	} else {
+		log.Printf("Warning: received response for unknown request ID: %d", id)
+	}
+}
+
+// sendRequestAndWait sends a request and waits for the response.
+func (m *Manager) sendRequestAndWait(request map[string]any) (map[string]any, error) {
+	id, ok := request["id"].(int)
+	if !ok {
+		return nil, fmt.Errorf("request missing integer ID")
+	}
+
+	// Create response channel
+	responseCh := make(chan map[string]any, 1)
+	m.responsesMux.Lock()
+	m.responses[id] = responseCh
+	m.responsesMux.Unlock()
+
+	// Send the request
+	if err := m.sendRequest(request); err != nil {
+		m.responsesMux.Lock()
+		delete(m.responses, id)
+		m.responsesMux.Unlock()
+		return nil, err
+	}
+
+	// Wait for response with timeout (60s for large codebases)
+	log.Printf("Waiting for response to request %d...", id)
+	startTime := time.Now()
+
+	// Progress ticker to show we're still waiting
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case response := <-responseCh:
+			elapsed := time.Since(startTime)
+			log.Printf("Received response to request %d after %v", id, elapsed)
+
+			// Check for LSP error
+			if errorField, hasError := response["error"]; hasError {
+				errorMap, _ := errorField.(map[string]any)
+				code, _ := errorMap["code"].(float64)
+				message, _ := errorMap["message"].(string)
+				return nil, fmt.Errorf("LSP error %d: %s", int(code), message)
+			}
+			return response, nil
+
+		case <-ticker.C:
+			elapsed := time.Since(startTime)
+			log.Printf("Still waiting for response to request %d (elapsed: %v)...", id, elapsed)
+
+		case <-time.After(60 * time.Second):
+			m.responsesMux.Lock()
+			delete(m.responses, id)
+			m.responsesMux.Unlock()
+			elapsed := time.Since(startTime)
+			msg := "timeout waiting for response to request %d after %v (gopls may be processing large codebase)"
+			return nil, fmt.Errorf(msg, id, elapsed)
 		}
 	}
-
-	if contentLength == 0 {
-		return nil, fmt.Errorf("no content-length header found")
-	}
-
-	// Read the JSON content
-	content := make([]byte, contentLength)
-	if _, err := io.ReadFull(m.stdout, content); err != nil {
-		return nil, fmt.Errorf("failed to read response content: %w", err)
-	}
-
-	var response map[string]any
-	if err := json.Unmarshal(content, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	return response, nil
 }
 
 // MCP tool parameter types
