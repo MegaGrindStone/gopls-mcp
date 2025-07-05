@@ -47,8 +47,6 @@ USER gopls
 # Expose port
 EXPOSE 8080
 
-# Set default workspace
-ENV WORKSPACE_PATH=/workspace
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
