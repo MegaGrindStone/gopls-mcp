@@ -1,0 +1,61 @@
+# Git files
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+README*
+CHANGELOG*
+LICENSE*
+CONTRIBUTING*
+
+# Test files
+*_test.go
+testdata/
+coverage.out
+
+# Build artifacts
+gopls-mcp
+*.exe
+*.dll
+*.so
+*.dylib
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+*.tmp
+*.temp
+
+# Docker files
+Dockerfile*
+.dockerignore
+
+# CI/CD files
+.github/
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+
+# Dependency directories (will be downloaded in container)
+vendor/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Log files
+*.log
+
+# Temporary files
+tmp/
+temp/
