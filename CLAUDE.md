@@ -395,18 +395,22 @@ When ready to create a release:
    - Build binary: `go build -o gopls-mcp`
    - Test Docker build: `docker build -t gopls-mcp .`
 
-2. **Create Release**:
+2. **Commit Changelog**:
+   - Commit CHANGELOG.md changes: `git add CHANGELOG.md && git commit -m "Update CHANGELOG.md for v1.0.0"`
+   - Push to main branch: `git push origin main`
+
+3. **Create Release**:
    - Use semantic versioning (e.g., `v1.0.0`)
    - Create release with GitHub CLI: `gh release create v1.0.0 --generate-notes`
    - Upload binary: `gh release upload v1.0.0 ./gopls-mcp`
 
-3. **Automated CI/CD**:
+4. **Automated CI/CD**:
    - GitHub Actions automatically triggers on release publication
    - Quality gates run (tests, linting, formatting)
    - Docker images built and pushed to Docker Hub
    - Docker Hub will have new tags: `v1.0.0`, `latest`
 
-4. **Monitor Release**:
+5. **Monitor Release**:
    - Check GitHub Actions: `gh run list --limit 5`
    - View specific run: `gh run view <run-id>`
    - Check Docker Hub tags: `docker pull <image> --all-tags`
