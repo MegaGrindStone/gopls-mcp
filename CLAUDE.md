@@ -93,7 +93,7 @@ gh release delete v1.0.0
 - **lsp.go**: LSP protocol types and gopls communication methods
 - **Dockerfile**: Multi-stage Docker build with gopls installation and security hardening
 - **.dockerignore**: Docker context optimization for faster builds
-- **.github/workflows/docker.yml**: CI/CD pipeline with quality gates and automated Docker publishing
+- **.github/workflows/release.yaml**: Release-triggered CI/CD pipeline with quality gates and automated Docker publishing
 - **.golangci.yaml**: Comprehensive linting configuration for code quality
 
 ### Test Files
@@ -218,18 +218,18 @@ The project is automatically built and published to Docker Hub at `megagrindston
 
 ### GitHub Actions Workflow
 
-Automated pipeline (`.github/workflows/docker.yml`) that:
+Automated release pipeline (`.github/workflows/release.yaml`) that:
 
-1. **Quality Gates** (runs on all pushes/PRs):
+1. **Quality Gates** (runs on GitHub releases):
    - Go tests: `go test ./... -v -count=1 -p 1`
    - Code formatting: `gofmt` validation
    - Code quality: `golangci-lint` with comprehensive rules
    - Dependencies: `go mod verify`
 
-2. **Docker Build & Push** (main branch and tags only):
+2. **Docker Build & Push** (release only):
    - Multi-platform builds (amd64/arm64)
    - Automated push to Docker Hub
-   - Smart tagging strategy
+   - Semantic versioning tags
    - Build caching for performance
 
 ### Required GitHub Secrets
@@ -240,9 +240,9 @@ Automated pipeline (`.github/workflows/docker.yml`) that:
 ### Development Workflow
 
 1. **Local Development**: Standard Go commands + local Docker testing
-2. **Pull Request**: Triggers quality gates (tests, linting)
-3. **Main Branch**: Triggers full pipeline + Docker Hub push
-4. **Version Tags**: Creates versioned Docker images (`v1.0.0`, etc.)
+2. **Pull Request**: Manual testing and code review
+3. **Release Creation**: Triggers full pipeline + Docker Hub push
+4. **Version Tags**: Automated creation of versioned Docker images (`v1.0.0`, etc.)
 
 ## MCP Development Context
 
@@ -337,10 +337,11 @@ When ready to create a release:
    - Create release with GitHub CLI: `gh release create v1.0.0 --generate-notes`
    - Upload binary: `gh release upload v1.0.0 ./gopls-mcp`
 
-3. **Post-Release**:
-   - GitHub Actions will automatically build and push Docker images
+3. **Automated CI/CD**:
+   - GitHub Actions automatically triggers on release publication
+   - Quality gates run (tests, linting, formatting)
+   - Docker images built and pushed to Docker Hub
    - Docker Hub will have new tags: `v1.0.0`, `latest`
-   - Release notes will be auto-generated from commit history
 
 4. **Monitor Release**:
    - Check GitHub Actions: `gh run list --limit 5`
@@ -359,8 +360,8 @@ gh run list --limit 5
 # View failed run details
 gh run view <run-id> --log-failed
 
-# Common fix: Docker tag issues in .github/workflows/docker.yml
-# Remove problematic tag patterns like "type=sha,prefix={{branch}}-"
+# Common fix: Docker tag issues in .github/workflows/release.yaml
+# Ensure proper semantic versioning patterns in tagging strategy
 ```
 
 **Re-tagging Failed Release**:
