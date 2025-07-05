@@ -272,15 +272,21 @@ Ensures reliable operation with large codebases:
 
 ## CI/CD Pipeline
 
-### GitHub Actions Workflow
+### GitHub Actions Workflows
 
-Automated release pipeline (`.github/workflows/release.yaml`) that:
+**Pull Request CI** (`.github/workflows/pr.yaml`):
 
-1. **Quality Gates** (runs on GitHub releases):
+1. **Quality Gates** (runs on PRs and pushes to main):
    - Go tests: `go test ./... -v -count=1 -p 1`
    - Code formatting: `gofmt` validation
    - Code quality: `golangci-lint` with comprehensive rules
    - Dependencies: `go mod verify`
+
+**Release Pipeline** (`.github/workflows/release.yaml`):
+
+1. **Quality Gates** (runs on GitHub releases):
+   - Same quality gates as PR workflow
+   - Ensures release readiness
 
 2. **Docker Build & Push** (release only):
    - Multi-platform builds (amd64/arm64)
@@ -296,7 +302,7 @@ Automated release pipeline (`.github/workflows/release.yaml`) that:
 ### Development Workflow
 
 1. **Local Development**: Standard Go commands + local Docker testing
-2. **Pull Request**: Manual testing and code review
+2. **Pull Request**: Automated quality gates (tests, linting, formatting) + code review
 3. **Release Creation**: Triggers full pipeline + Docker Hub push
 4. **Version Tags**: Automated creation of versioned Docker images (`v1.0.0`, etc.)
 
