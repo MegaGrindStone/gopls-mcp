@@ -2,12 +2,16 @@
 
 [![GitHub release](https://img.shields.io/github/release/MegaGrindStone/gopls-mcp.svg)](https://github.com/MegaGrindStone/gopls-mcp/releases)
 [![Docker Hub](https://img.shields.io/docker/pulls/megagrindstone/gopls-mcp)](https://hub.docker.com/r/megagrindstone/gopls-mcp)
-[![CI](https://github.com/MegaGrindStone/gopls-mcp/workflows/Release/badge.svg)](https://github.com/MegaGrindStone/gopls-mcp/actions)
+[![CI](https://github.com/MegaGrindStone/gopls-mcp/actions/workflows/release.yaml/badge.svg)](https://github.com/MegaGrindStone/gopls-mcp/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A Model Context Protocol (MCP) server that integrates [gopls](https://pkg.go.dev/golang.org/x/tools/gopls) (Go language server) with MCP-compatible hosts like Claude Code, Claude Desktop, and VS Code.
 
 I've developed this project in collaboration with [Claude Code](https://claude.ai/code) to provide seamless Go language server capabilities through the MCP protocol, enabling powerful Go development assistance in AI-powered coding environments.
+
+## Important Note
+
+This project uses the [Model Context Protocol Go SDK](https://github.com/modelcontextprotocol/go-sdk) as its core MCP library. Since the go-sdk is currently in early development (v0.1.0) and not yet stable, this project will not have stable releases until the go-sdk reaches stability. Please consider this when using gopls-mcp in production environments.
 
 ## Features
 
@@ -375,4 +379,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 **Collaboration:** Developed with Claude Code  
 **Repository:** <https://github.com/MegaGrindStone/gopls-mcp>  
 **Docker Hub:** <https://hub.docker.com/r/megagrindstone/gopls-mcp>
-
