@@ -194,8 +194,10 @@ The project is automatically built and published to Docker Hub at `megagrindston
 
 **Available Tags:**
 
-- `latest` - Latest build from main branch
-- `v*` - Semantic version tags (e.g., `v1.0.0`)
+- `latest` - Latest stable release
+- `v*` - Semantic version tags (e.g., `v0.1.0`)
+- `*.*` - Version without 'v' prefix (e.g., `0.1.0`, `0.1`, `0`)
+- `main` - Latest main branch build
 - `main-<sha>` - Specific commit builds
 
 **Multi-platform Support:**
@@ -339,3 +341,48 @@ When ready to create a release:
    - GitHub Actions will automatically build and push Docker images
    - Docker Hub will have new tags: `v1.0.0`, `latest`
    - Release notes will be auto-generated from commit history
+
+4. **Monitor Release**:
+   - Check GitHub Actions: `gh run list --limit 5`
+   - View specific run: `gh run view <run-id>`
+   - Check Docker Hub tags: `docker pull <image> --all-tags`
+   - View release status: `gh release view <tag>`
+
+### Troubleshooting Releases
+
+**Failed GitHub Actions Build**:
+
+```bash
+# Check recent runs
+gh run list --limit 5
+
+# View failed run details
+gh run view <run-id> --log-failed
+
+# Common fix: Docker tag issues in .github/workflows/docker.yml
+# Remove problematic tag patterns like "type=sha,prefix={{branch}}-"
+```
+
+**Re-tagging Failed Release**:
+
+```bash
+# Delete tag locally and remotely
+git tag -d v1.0.0
+git push origin :refs/tags/v1.0.0
+
+# Fix issues, commit, push
+
+# Re-create tag
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+**Docker Image Cleanup**:
+
+```bash
+# Remove all local images for cleanup
+docker rmi $(docker images <image-name> -q)
+
+# View available tags
+docker images <image-name> --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}"
+```
