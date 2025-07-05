@@ -80,30 +80,16 @@ func (m *Manager) GoToDefinition(_ context.Context, uri string, line, character 
 	}
 
 	// Extract locations from response
-	if result, ok := response["result"]; ok {
-		if locations, ok := result.([]any); ok {
-			var locs []Location
-			for _, loc := range locations {
-				if locMap, ok := loc.(map[string]any); ok {
-					var location Location
-					if uri, ok := locMap["uri"].(string); ok {
-						location.URI = uri
-					}
-					if rangeMap, ok := locMap["range"].(map[string]any); ok {
-						location.Range = parseRange(rangeMap)
-					}
-					locs = append(locs, location)
-				}
-			}
-			return locs, nil
-		}
-	}
-
-	return nil, fmt.Errorf("invalid definition response format")
+	return parseLocationsFromResponse(response)
 }
 
 // FindReferences sends a textDocument/references request to gopls.
-func (m *Manager) FindReferences(_ context.Context, uri string, line, character int, includeDeclaration bool) ([]Location, error) {
+func (m *Manager) FindReferences(
+	_ context.Context,
+	uri string,
+	line, character int,
+	includeDeclaration bool,
+) ([]Location, error) {
 	if !m.IsRunning() {
 		return nil, fmt.Errorf("gopls is not running")
 	}
@@ -136,26 +122,7 @@ func (m *Manager) FindReferences(_ context.Context, uri string, line, character 
 	}
 
 	// Extract locations from response
-	if result, ok := response["result"]; ok {
-		if locations, ok := result.([]any); ok {
-			var locs []Location
-			for _, loc := range locations {
-				if locMap, ok := loc.(map[string]any); ok {
-					var location Location
-					if uri, ok := locMap["uri"].(string); ok {
-						location.URI = uri
-					}
-					if rangeMap, ok := locMap["range"].(map[string]any); ok {
-						location.Range = parseRange(rangeMap)
-					}
-					locs = append(locs, location)
-				}
-			}
-			return locs, nil
-		}
-	}
-
-	return nil, fmt.Errorf("invalid references response format")
+	return parseLocationsFromResponse(response)
 }
 
 // GetHover sends a textDocument/hover request to gopls.
@@ -187,47 +154,97 @@ func (m *Manager) GetHover(_ context.Context, uri string, line, character int) (
 	}
 
 	// Extract hover information from response
-	if result, ok := response["result"]; ok {
-		if hoverMap, ok := result.(map[string]any); ok {
-			var hover Hover
-			if contents, ok := hoverMap["contents"]; ok {
-				if contentList, ok := contents.([]any); ok {
-					for _, content := range contentList {
-						if contentStr, ok := content.(string); ok {
-							hover.Contents = append(hover.Contents, contentStr)
-						}
-					}
-				}
-			}
-			if rangeMap, ok := hoverMap["range"].(map[string]any); ok {
-				rng := parseRange(rangeMap)
-				hover.Range = &rng
-			}
-			return &hover, nil
-		}
-	}
-
-	return nil, fmt.Errorf("invalid hover response format")
+	return parseHoverFromResponse(response)
 }
 
 // parseRange parses a range from a map.
 func parseRange(rangeMap map[string]any) Range {
 	var rng Range
-	if startMap, ok := rangeMap["start"].(map[string]any); ok {
-		if line, ok := startMap["line"].(float64); ok {
+	if startMap, startMapOk := rangeMap["start"].(map[string]any); startMapOk {
+		if line, lineOk := startMap["line"].(float64); lineOk {
 			rng.Start.Line = int(line)
 		}
-		if char, ok := startMap["character"].(float64); ok {
+		if char, charOk := startMap["character"].(float64); charOk {
 			rng.Start.Character = int(char)
 		}
 	}
-	if endMap, ok := rangeMap["end"].(map[string]any); ok {
-		if line, ok := endMap["line"].(float64); ok {
+	if endMap, endMapOk := rangeMap["end"].(map[string]any); endMapOk {
+		if line, lineOk := endMap["line"].(float64); lineOk {
 			rng.End.Line = int(line)
 		}
-		if char, ok := endMap["character"].(float64); ok {
+		if char, charOk := endMap["character"].(float64); charOk {
 			rng.End.Character = int(char)
 		}
 	}
 	return rng
+}
+
+// parseLocationFromMap parses a single location from a map.
+func parseLocationFromMap(locMap map[string]any) Location {
+	var location Location
+	if locURI, uriOk := locMap["uri"].(string); uriOk {
+		location.URI = locURI
+	}
+	if rangeMap, rangeMapOk := locMap["range"].(map[string]any); rangeMapOk {
+		location.Range = parseRange(rangeMap)
+	}
+	return location
+}
+
+// parseLocationsFromResponse extracts locations from LSP response.
+func parseLocationsFromResponse(response map[string]any) ([]Location, error) {
+	result, resultOk := response["result"]
+	if !resultOk {
+		return nil, fmt.Errorf("invalid response format")
+	}
+
+	locations, locationsOk := result.([]any)
+	if !locationsOk {
+		return nil, fmt.Errorf("invalid response format")
+	}
+
+	var locs []Location
+	for _, loc := range locations {
+		if locMap, locMapOk := loc.(map[string]any); locMapOk {
+			location := parseLocationFromMap(locMap)
+			locs = append(locs, location)
+		}
+	}
+	return locs, nil
+}
+
+// parseHoverContents parses hover contents from any type.
+func parseHoverContents(contents any) []string {
+	var result []string
+	if contentList, contentListOk := contents.([]any); contentListOk {
+		for _, content := range contentList {
+			if contentStr, contentStrOk := content.(string); contentStrOk {
+				result = append(result, contentStr)
+			}
+		}
+	}
+	return result
+}
+
+// parseHoverFromResponse extracts hover information from LSP response.
+func parseHoverFromResponse(response map[string]any) (*Hover, error) {
+	result, resultOk := response["result"]
+	if !resultOk {
+		return nil, fmt.Errorf("invalid hover response format")
+	}
+
+	hoverMap, hoverMapOk := result.(map[string]any)
+	if !hoverMapOk {
+		return nil, fmt.Errorf("invalid hover response format")
+	}
+
+	var hover Hover
+	if contents, contentsOk := hoverMap["contents"]; contentsOk {
+		hover.Contents = parseHoverContents(contents)
+	}
+	if rangeMap, rangeMapOk := hoverMap["range"].(map[string]any); rangeMapOk {
+		rng := parseRange(rangeMap)
+		hover.Range = &rng
+	}
+	return &hover, nil
 }

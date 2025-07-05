@@ -134,4 +134,3 @@ This project implements a Model Context Protocol server that interfaces with gop
 - Implement proper error handling for MCP communication
 - Consider adding configuration files for gopls integration settings
 - Add appropriate logging for debugging MCP interactions
-

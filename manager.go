@@ -268,7 +268,11 @@ type GetHoverResult struct {
 // MCP tool handlers
 
 // HandleGoToDefinition handles go to definition requests.
-func (m *Manager) HandleGoToDefinition(ctx context.Context, _ *mcp.ServerSession, params *mcp.CallToolParamsFor[GoToDefinitionParams]) (*mcp.CallToolResultFor[GoToDefinitionResult], error) {
+func (m *Manager) HandleGoToDefinition(
+	ctx context.Context,
+	_ *mcp.ServerSession,
+	params *mcp.CallToolParamsFor[GoToDefinitionParams],
+) (*mcp.CallToolResultFor[GoToDefinitionResult], error) {
 	if !m.IsRunning() {
 		return nil, fmt.Errorf("gopls is not running")
 	}
@@ -307,12 +311,22 @@ func (m *Manager) HandleGoToDefinition(ctx context.Context, _ *mcp.ServerSession
 }
 
 // HandleFindReferences handles find references requests.
-func (m *Manager) HandleFindReferences(ctx context.Context, _ *mcp.ServerSession, params *mcp.CallToolParamsFor[FindReferencesParams]) (*mcp.CallToolResultFor[FindReferencesResult], error) {
+func (m *Manager) HandleFindReferences(
+	ctx context.Context,
+	_ *mcp.ServerSession,
+	params *mcp.CallToolParamsFor[FindReferencesParams],
+) (*mcp.CallToolResultFor[FindReferencesResult], error) {
 	if !m.IsRunning() {
 		return nil, fmt.Errorf("gopls is not running")
 	}
 
-	locations, err := m.FindReferences(ctx, params.Arguments.URI, params.Arguments.Line, params.Arguments.Character, params.Arguments.IncludeDeclaration)
+	locations, err := m.FindReferences(
+		ctx,
+		params.Arguments.URI,
+		params.Arguments.Line,
+		params.Arguments.Character,
+		params.Arguments.IncludeDeclaration,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find references: %w", err)
 	}
@@ -346,7 +360,11 @@ func (m *Manager) HandleFindReferences(ctx context.Context, _ *mcp.ServerSession
 }
 
 // HandleGetHover handles get hover info requests.
-func (m *Manager) HandleGetHover(ctx context.Context, _ *mcp.ServerSession, params *mcp.CallToolParamsFor[GetHoverParams]) (*mcp.CallToolResultFor[GetHoverResult], error) {
+func (m *Manager) HandleGetHover(
+	ctx context.Context,
+	_ *mcp.ServerSession,
+	params *mcp.CallToolParamsFor[GetHoverParams],
+) (*mcp.CallToolResultFor[GetHoverResult], error) {
 	if !m.IsRunning() {
 		return nil, fmt.Errorf("gopls is not running")
 	}
