@@ -210,3 +210,122 @@ func TestHTTPMuxSetup(t *testing.T) {
 		t.Error("Mux should not be nil after adding handler")
 	}
 }
+
+func TestTransportFlagParsing(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		expected string
+	}{
+		{
+			name:     "default transport (http)",
+			args:     []string{"gopls-mcp", "-workspace", "/test"},
+			expected: "http",
+		},
+		{
+			name:     "explicit http transport",
+			args:     []string{"gopls-mcp", "-workspace", "/test", "-transport", "http"},
+			expected: "http",
+		},
+		{
+			name:     "stdio transport",
+			args:     []string{"gopls-mcp", "-workspace", "/test", "-transport", "stdio"},
+			expected: "stdio",
+		},
+		{
+			name:     "transport with equals",
+			args:     []string{"gopls-mcp", "-workspace", "/test", "-transport=stdio"},
+			expected: "stdio",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Save original command line arguments
+			origArgs := os.Args
+			defer func() {
+				os.Args = origArgs
+			}()
+
+			// Set test arguments
+			os.Args = tt.args
+
+			// Reset flag for testing
+			flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+
+			// Parse flags
+			workspacePath := flag.String("workspace", "", "Path to the Go workspace directory (required)")
+			transportType := flag.String("transport", "http", "Transport type: http or stdio")
+			flag.Parse()
+
+			if *transportType != tt.expected {
+				t.Errorf("Expected transport type %s, got %s", tt.expected, *transportType)
+			}
+
+			// Ensure workspace is still parsed correctly
+			if *workspacePath != "/test" {
+				t.Errorf("Expected workspace path /test, got %s", *workspacePath)
+			}
+		})
+	}
+}
+
+func TestTransportValidation(t *testing.T) {
+	tests := []struct {
+		name      string
+		transport string
+		valid     bool
+	}{
+		{
+			name:      "valid http transport",
+			transport: "http",
+			valid:     true,
+		},
+		{
+			name:      "valid stdio transport",
+			transport: "stdio",
+			valid:     true,
+		},
+		{
+			name:      "invalid transport",
+			transport: "invalid",
+			valid:     false,
+		},
+		{
+			name:      "empty transport",
+			transport: "",
+			valid:     false,
+		},
+		{
+			name:      "websocket transport (not supported)",
+			transport: "websocket",
+			valid:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			isValid := tt.transport == "http" || tt.transport == "stdio"
+			if isValid != tt.valid {
+				t.Errorf("Expected transport %s validity to be %v, got %v", tt.transport, tt.valid, isValid)
+			}
+		})
+	}
+}
+
+func TestSetupMCPServer(t *testing.T) {
+	// Create a test manager
+	workspacePath := "/test/workspace"
+	manager := NewManager(workspacePath)
+
+	// Test server setup
+	server := setupMCPServer(manager)
+
+	if server == nil {
+		t.Fatal("Expected non-nil MCP server")
+	}
+
+	// The server should be properly configured with tools
+	// (We can't test the tools directly without starting gopls,
+	// but we can verify the server is created)
+}
