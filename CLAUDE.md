@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Go project for implementing a Model Context Protocol (MCP) server for gopls (Go language server). The server uses SSE (Server-Sent Events) transport to provide Go language server capabilities to MCP clients like Claude.
+This is a Go project for implementing a Model Context Protocol (MCP) server for gopls (Go language server). The server uses streamable HTTP transport to provide Go language server capabilities to MCP clients like Claude.
 
 ## Development Commands
 
@@ -81,14 +81,14 @@ gh release delete v1.0.0
 - **Go Version**: 1.24.4
 - **Current State**: Fully functional MCP server with gopls integration, Docker support, and CI/CD pipeline
 - **Purpose**: MCP server for gopls integration
-- **Transport**: SSE (Server-Sent Events) over HTTP
+- **Transport**: Streamable HTTP transport
 - **Dependencies**: `github.com/modelcontextprotocol/go-sdk`
 - **Deployment**: Docker Hub (`megagrindstone/gopls-mcp`) with multi-platform support
 - **CI/CD**: GitHub Actions with comprehensive quality gates and automated Docker builds
 
 ### Key Components
 
-- **main.go**: HTTP server setup with SSE transport and MCP server initialization
+- **main.go**: HTTP server setup with streamable HTTP transport and MCP server initialization
 - **manager.go**: gopls process management, LSP client, and MCP tool handlers
 - **lsp.go**: LSP protocol types and gopls communication methods
 - **Dockerfile**: Multi-stage Docker build with gopls installation and security hardening
@@ -136,7 +136,7 @@ docker build -t gopls-mcp .
 docker run -v /path/to/go/project:/workspace -p 8080:8080 gopls-mcp
 ```
 
-The server will start on port 8080 with SSE endpoint at `http://localhost:8080/sse`.
+The server will start on port 8080 at `http://localhost:8080`.
 
 ### MCP Tool Examples
 
@@ -184,7 +184,7 @@ The server will start on port 8080 with SSE endpoint at `http://localhost:8080/s
 
 - **-workspace**: Required command-line flag to set the Go workspace path
 - **Default Port**: 8080 (hardcoded)
-- **SSE Endpoint**: `/sse`
+- **Port**: 8080 (streamable HTTP transport)
 
 ## Docker Deployment
 
@@ -214,74 +214,35 @@ The project is automatically built and published to Docker Hub at `megagrindston
 - **Health Check**: HTTP endpoint monitoring
 - **Dependencies**: gopls pre-installed
 
-## Architecture Improvements (2025-07-05)
+## LSP Communication Architecture
 
-### LSP Communication Fix
+The system implements robust LSP communication with gopls using the following components:
 
-Fixed issue where the app would hang during gopls communication by implementing:
+### Message Handling
 
-1. **Continuous Message Reader**: Replaced single-shot response reading with a continuous reader goroutine that handles all LSP messages (responses, requests, notifications)
+- **messageReader()**: Continuous goroutine that reads all LSP messages from gopls stdout
+- **sendRequestAndWait()**: Sends LSP requests and waits for correlated responses with 60-second timeout  
+- **routeResponse()**: Routes responses to waiting request handlers by request ID
+- **readLSPMessage()**: Reads complete LSP messages with proper header parsing (`\r\n` line endings)
+- **handleLSPMessage()**: Routes messages by type (response/request/notification)
 
-2. **Proper Header Parsing**: Fixed parsing of LSP headers to correctly handle `\r\n` line endings and Content-Length extraction
+### File Management
 
-3. **Request-Response Correlation**: Implemented proper request ID tracking with response channels to match responses to their corresponding requests
+The system automatically manages file context for gopls:
 
-4. **Error Handling**: Added comprehensive error handling for LSP error responses and communication failures
+- **ensureFileOpen()**: Opens files in gopls via `textDocument/didOpen` before making requests
+- **File Tracking**: Maintains registry of open files to avoid duplicate notifications
+- **Content Reading**: Reads file content from disk with automatic language detection
+- **Language Detection**: Supports Go files (`.go`), `go.mod`, and `go.sum` files
 
-5. **Timeout Protection**: All LSP operations now have a 10-second timeout to prevent indefinite blocking
+### Workspace Readiness
 
-6. **Stderr Monitoring**: Added goroutine to capture and log gopls stderr output for better debugging
+Ensures reliable operation with large codebases:
 
-### Key Components Added
-
-- **messageReader()**: Continuous goroutine that reads all LSP messages from stdout
-- **sendRequestAndWait()**: Sends a request and waits for the correlated response with timeout
-- **routeResponse()**: Routes responses to waiting request handlers by ID
-- **readLSPMessage()**: Reads a complete LSP message (headers + content)
-- **handleLSPMessage()**: Routes messages based on type (response/request/notification)
-
-### File Management Fix (2025-07-05)
-
-Added automatic file opening to fix the issue where tools would hang waiting for gopls responses:
-
-1. **ensureFileOpen()**: Automatically opens files in gopls via `textDocument/didOpen` before making requests
-2. **File Tracking**: Tracks which files are already open to avoid duplicate `didOpen` notifications
-3. **Content Reading**: Reads file content from disk and sends it to gopls with proper language detection
-4. **Language Detection**: Automatically detects Go files (.go), go.mod files, and go.sum files
-
-**How it Works**: Before making any LSP request (go to definition, find references, hover), the system now:
-- Checks if the file is already open in gopls
-- If not, reads the file content from disk
-- Sends a `textDocument/didOpen` notification with the file content
-- Marks the file as open to avoid duplicate notifications
-- Then proceeds with the original LSP request
-
-This ensures gopls has the necessary file context to provide accurate analysis results.
-
-### Workspace Readiness and Timeout Fix (2025-07-05)
-
-Added workspace readiness tracking and increased timeouts to handle large codebases:
-
-1. **Workspace Readiness Tracking**: 
-   - Monitors `window/showMessage` and `$/progress` notifications from gopls
-   - Waits for "Finished loading packages" message before allowing LSP requests
-   - Prevents requests from being sent before gopls is ready to handle them
-
-2. **Increased Timeouts**:
-   - Extended LSP request timeout from 10 seconds to 60 seconds for large codebases
-   - Added progress logging every 10 seconds to show request is still being processed
-   - Better error messages indicating when gopls might be processing large codebase
-
-3. **Enhanced Notification Handling**:
-   - Properly handles both `window/showMessage` and `$/progress` notification formats
-   - Tracks workspace initialization status throughout the session
-   - Provides clear logging when workspace becomes ready
-
-**How it Works**: 
-- After gopls initialization, the system waits for workspace readiness notifications
-- LSP requests are blocked until gopls sends "Finished loading packages" message
-- Once ready, requests are sent with 60-second timeout and progress logging
-- This ensures reliable operation even with large Go projects that take time to index
+- **Readiness Tracking**: Monitors `window/showMessage` and `$/progress` notifications from gopls
+- **Initialization Blocking**: Waits for "Finished loading packages" before allowing LSP requests
+- **Timeout Management**: 60-second timeout for LSP operations with progress logging every 10 seconds
+- **Error Handling**: Comprehensive error handling for LSP communication failures
 
 ## CI/CD Pipeline
 
@@ -317,7 +278,7 @@ Automated release pipeline (`.github/workflows/release.yaml`) that:
 
 This project implements a Model Context Protocol server that interfaces with gopls using:
 
-1. **SSE Transport**: HTTP-based communication suitable for web clients
+1. **Streamable HTTP Transport**: HTTP-based communication suitable for web clients
 2. **gopls Integration**: Subprocess management with LSP communication
 3. **MCP Tools**: Structured tools for Go language server features
 4. **Graceful Shutdown**: Proper cleanup of gopls processes
@@ -355,6 +316,13 @@ go test -v lsp_test.go
 ```
 
 ## Development Guidelines
+
+### Documentation Strategy
+
+- **CLAUDE.md**: Document the current state of the application (architecture, commands, usage)
+- **CHANGELOG.md**: Record all changes chronologically under "Unreleased" section during development
+- **Avoid Historical Sections**: Do not add dated fix descriptions to CLAUDE.md (e.g., "LSP Communication Fix (2025-07-05)")
+- **When Releasing**: Move "Unreleased" changes in CHANGELOG.md to the new version section
 
 ### Code Quality
 

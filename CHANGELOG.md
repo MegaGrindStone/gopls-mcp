@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **LSP Communication Improvements**: Continuous message reader, proper header parsing, request-response correlation, and timeout protection
+- **File Management**: Automatic file opening in gopls with `textDocument/didOpen` before making requests
+- **Workspace Readiness Tracking**: Monitors gopls notifications and waits for "Finished loading packages" before allowing requests
+- **Enhanced Error Handling**: Comprehensive error handling for LSP communication failures
+- **Timeout Management**: Extended LSP request timeout to 60 seconds with progress logging for large codebases
+
+### Changed
+
+- **BREAKING**: Replaced SSE transport with streamable HTTP transport for MCP specification compliance
+- Updated connection endpoint from `http://localhost:8080/sse` to `http://localhost:8080`
+- Updated client connection from `--transport sse` to `--transport http`
+- Simplified HTTP server setup by removing mux routing in favor of direct handler
+- Updated Docker health check to use root path instead of `/sse` endpoint
+
 ## [v0.1.0] - 2025-07-05
 
 ### Added

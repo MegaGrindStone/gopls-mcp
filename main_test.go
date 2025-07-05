@@ -149,13 +149,13 @@ func TestMCPServerCreation(t *testing.T) {
 		t.Error("Expected non-nil MCP server")
 	}
 
-	// Test that we can create an SSE handler
-	handler := mcp.NewSSEHandler(func(_ *http.Request) *mcp.Server {
+	// Test that we can create a streamable HTTP handler
+	handler := mcp.NewStreamableHTTPHandler(func(_ *http.Request) *mcp.Server {
 		return server
-	})
+	}, nil)
 
 	if handler == nil {
-		t.Error("Expected non-nil SSE handler")
+		t.Error("Expected non-nil streamable HTTP handler")
 	}
 }
 
