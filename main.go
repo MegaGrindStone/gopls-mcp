@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -19,6 +19,10 @@ const (
 )
 
 func main() {
+	// Initialize logger
+	logger := initLogger()
+	slog.SetDefault(logger)
+
 	// Parse command line flags
 	workspacePath := flag.String("workspace", "", "Path to the Go workspace directory (required)")
 	transportType := flag.String("transport", "http", "Transport type: http or stdio")
@@ -26,23 +30,25 @@ func main() {
 
 	// Validate that workspace path is provided
 	if *workspacePath == "" {
-		log.Fatal("Error: -workspace flag is required")
+		logger.Error("workspace flag is required")
+		os.Exit(1)
 	}
 
 	// Validate transport type
 	if *transportType != transportHTTP && *transportType != transportStdio {
-		log.Fatal("Error: -transport must be either 'http' or 'stdio'")
+		logger.Error("transport must be either 'http' or 'stdio'", "provided", *transportType)
+		os.Exit(1)
 	}
 
 	// Create gopls manager
-	goplsManager := NewManager(*workspacePath)
+	goplsManager := NewManager(*workspacePath, logger)
 
 	// Start gopls
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	if err := goplsManager.Start(ctx); err != nil {
-		log.Printf("Failed to start gopls: %v", err)
+		logger.Error("failed to start gopls", "error", err)
 		return
 	}
 	defer func() { _ = goplsManager.Stop() }()
@@ -55,21 +61,21 @@ func main() {
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 		<-sigChan
-		log.Println("Shutting down server...")
+		logger.Info("shutting down server")
 		cancel()
 		_ = goplsManager.Stop()
 		os.Exit(0)
 	}()
 
-	log.Printf("Starting gopls-mcp server")
-	log.Printf("Workspace path: %s", *workspacePath)
-	log.Printf("Transport: %s", *transportType)
+	logger.Info("starting gopls-mcp server",
+		"workspace", *workspacePath,
+		"transport", *transportType)
 
 	// Start server based on transport type
 	if *transportType == transportStdio {
-		log.Println("Using stdio transport")
+		logger.Info("using stdio transport")
 		if err := server.Run(ctx, mcp.NewStdioTransport()); err != nil {
-			log.Printf("Stdio server failed: %v", err)
+			logger.Error("stdio server failed", "error", err)
 		}
 	} else {
 		// HTTP transport
@@ -77,7 +83,7 @@ func main() {
 			return server
 		}, nil)
 
-		log.Printf("HTTP server available at: http://localhost:8080")
+		logger.Info("HTTP server available", "url", "http://localhost:8080")
 
 		httpServer := &http.Server{
 			Addr:         ":8080",
@@ -88,7 +94,7 @@ func main() {
 		}
 
 		if err := httpServer.ListenAndServe(); err != nil {
-			log.Printf("HTTP server failed to start: %v", err)
+			logger.Error("HTTP server failed to start", "error", err)
 		}
 	}
 }

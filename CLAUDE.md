@@ -91,6 +91,8 @@ gh release delete v1.0.0
 - **main.go**: Multi-transport server setup with HTTP and stdio transport support and MCP server initialization
 - **manager.go**: gopls process management, LSP client, and MCP tool handlers
 - **lsp.go**: LSP protocol types and gopls communication methods
+- **logger.go**: Structured logging initialization with slog and environment variable configuration
+- **test_helpers.go**: Testing utilities including reduced-verbosity logger for tests
 - **Dockerfile**: Multi-stage Docker build with gopls installation and security hardening
 - **.dockerignore**: Docker context optimization for faster builds
 - **.github/workflows/release.yaml**: Release-triggered CI/CD pipeline with quality gates and automated Docker publishing
@@ -125,6 +127,10 @@ gh release delete v1.0.0
 # Or build and run with go
 go run . -workspace /path/to/go/project -transport http
 go run . -workspace /path/to/go/project -transport stdio
+
+# With logging configuration
+LOG_LEVEL=DEBUG ./gopls-mcp -workspace /path/to/go/project
+LOG_FORMAT=json LOG_LEVEL=WARN ./gopls-mcp -workspace /path/to/go/project
 ```
 
 #### Docker
@@ -139,6 +145,10 @@ docker run -v /path/to/go/project:/custom/path -p 8080:8080 megagrindstone/gopls
 # Local development with built image
 docker build -t gopls-mcp .
 docker run -v /path/to/go/project:/workspace -p 8080:8080 gopls-mcp
+
+# With logging configuration
+docker run -e LOG_LEVEL=DEBUG -v /path/to/go/project:/workspace -p 8080:8080 megagrindstone/gopls-mcp:latest
+docker run -e LOG_FORMAT=json -e LOG_LEVEL=INFO -v /path/to/go/project:/workspace -p 8080:8080 megagrindstone/gopls-mcp:latest
 ```
 
 The HTTP transport server will start on port 8080 at `http://localhost:8080`. The stdio transport communicates via standard input/output.
@@ -187,8 +197,18 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
 
 ## Configuration
 
+### Command-line Flags
+
 - **-workspace**: Required command-line flag to set the Go workspace path
 - **-transport**: Transport type, accepts 'http' or 'stdio' (defaults to 'http')
+
+### Environment Variables
+
+- **LOG_LEVEL**: Set logging level (DEBUG, INFO, WARN, ERROR) - defaults to INFO
+- **LOG_FORMAT**: Set log output format (text, json) - defaults to text
+
+### Transport Details
+
 - **HTTP Transport**: Port 8080 (streamable HTTP transport)
 - **Stdio Transport**: Uses standard input/output for communication
 

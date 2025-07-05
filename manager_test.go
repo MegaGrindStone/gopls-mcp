@@ -11,7 +11,8 @@ import (
 
 func TestNewManager(t *testing.T) {
 	workspacePath := "/test/workspace"
-	manager := NewManager(workspacePath)
+	logger := newTestLogger()
+	manager := NewManager(workspacePath, logger)
 
 	if manager == nil {
 		t.Fatal("NewManager() returned nil")
@@ -31,7 +32,8 @@ func TestNewManager(t *testing.T) {
 }
 
 func TestManagerIsRunning(t *testing.T) {
-	manager := NewManager("/test/workspace")
+	logger := newTestLogger()
+	manager := NewManager("/test/workspace", logger)
 
 	// Initially not running
 	if manager.IsRunning() {
@@ -58,7 +60,8 @@ func TestManagerIsRunning(t *testing.T) {
 }
 
 func TestManagerNextRequestID(t *testing.T) {
-	manager := NewManager("/test/workspace")
+	logger := newTestLogger()
+	manager := NewManager("/test/workspace", logger)
 
 	// Test sequential ID generation
 	id1 := manager.nextRequestID()
@@ -77,7 +80,8 @@ func TestManagerNextRequestID(t *testing.T) {
 }
 
 func TestManagerNextRequestIDConcurrency(t *testing.T) {
-	manager := NewManager("/test/workspace")
+	logger := newTestLogger()
+	manager := NewManager("/test/workspace", logger)
 	const numGoroutines = 100
 	const numCalls = 100
 
@@ -117,7 +121,8 @@ func TestManagerNextRequestIDConcurrency(t *testing.T) {
 }
 
 func TestManagerStop(t *testing.T) {
-	manager := NewManager("/test/workspace")
+	logger := newTestLogger()
+	manager := NewManager("/test/workspace", logger)
 
 	// Test stopping when not running
 	err := manager.Stop()
@@ -141,7 +146,8 @@ func TestManagerStop(t *testing.T) {
 }
 
 func TestManagerLSPMethodsWhenNotRunning(t *testing.T) {
-	manager := NewManager("/test/workspace")
+	logger := newTestLogger()
+	manager := NewManager("/test/workspace", logger)
 	ctx := context.Background()
 
 	// Test GoToDefinition when not running
@@ -164,7 +170,8 @@ func TestManagerLSPMethodsWhenNotRunning(t *testing.T) {
 }
 
 func TestManagerMCPToolHandlersWhenNotRunning(t *testing.T) {
-	manager := NewManager("/test/workspace")
+	logger := newTestLogger()
+	manager := NewManager("/test/workspace", logger)
 	ctx := context.Background()
 
 	// Test HandleGoToDefinition when not running
@@ -209,7 +216,8 @@ func TestManagerMCPToolHandlersWhenNotRunning(t *testing.T) {
 }
 
 func TestManagerCreateTools(t *testing.T) {
-	manager := NewManager("/test/workspace")
+	logger := newTestLogger()
+	manager := NewManager("/test/workspace", logger)
 
 	// Test CreateGoToDefinitionTool
 	tool := manager.CreateGoToDefinitionTool()

@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/url"
 	"os"
 	"os/exec"
@@ -35,14 +35,16 @@ type Manager struct {
 	openFilesMux      sync.RWMutex
 	workspaceReady    bool
 	workspaceReadyMux sync.RWMutex
+	logger            *slog.Logger
 }
 
 // NewManager creates a new gopls manager with the specified workspace path.
-func NewManager(workspacePath string) *Manager {
+func NewManager(workspacePath string, logger *slog.Logger) *Manager {
 	return &Manager{
 		workspacePath: workspacePath,
 		responses:     make(map[int]chan map[string]any),
 		openFiles:     make(map[string]bool),
+		logger:        logger,
 	}
 }
 
@@ -84,10 +86,10 @@ func (m *Manager) Start(ctx context.Context) error {
 	go func() {
 		scanner := bufio.NewScanner(m.stderr)
 		for scanner.Scan() {
-			log.Printf("gopls stderr: %s", scanner.Text())
+			m.logger.Debug("gopls stderr", "output", scanner.Text())
 		}
 		if err := scanner.Err(); err != nil {
-			log.Printf("error reading gopls stderr: %v", err)
+			m.logger.Error("error reading gopls stderr", "error", err)
 		}
 	}()
 
@@ -114,7 +116,7 @@ func (m *Manager) messageReader() {
 		message, err := m.readLSPMessage(reader)
 		if err != nil {
 			if m.running {
-				log.Printf("Error reading LSP message: %v", err)
+				m.logger.Error("error reading LSP message", "error", err)
 			}
 			return
 		}
@@ -265,7 +267,7 @@ func (m *Manager) ensureFileOpen(fileURI string) error {
 	m.openFiles[fileURI] = true
 	m.openFilesMux.Unlock()
 
-	log.Printf("Opened file in gopls: %s", fileURI)
+	m.logger.Info("opened file in gopls", "uri", fileURI)
 	return nil
 }
 
@@ -282,7 +284,7 @@ func (m *Manager) setWorkspaceReady() {
 	defer m.workspaceReadyMux.Unlock()
 	if !m.workspaceReady {
 		m.workspaceReady = true
-		log.Printf("Workspace marked as ready for LSP requests")
+		m.logger.Info("workspace marked as ready for LSP requests")
 	}
 }
 
@@ -292,7 +294,7 @@ func (m *Manager) waitForWorkspaceReady(timeout time.Duration) error {
 		return nil
 	}
 
-	log.Printf("Waiting for gopls to finish loading packages...")
+	m.logger.Info("waiting for gopls to finish loading packages")
 
 	start := time.Now()
 	for time.Since(start) < timeout {
@@ -318,10 +320,10 @@ func (m *Manager) handleLSPMessage(message map[string]any) {
 		}
 	case hasID && hasMethod:
 		// This is a request from the server (we don't handle these yet)
-		log.Printf("Received request from gopls: %+v", message)
+		m.logger.Debug("received request from gopls", "message", message)
 	case hasMethod:
 		// This is a notification
-		log.Printf("Received notification from gopls: %+v", message)
+		m.logger.Debug("received notification from gopls", "message", message)
 		if methodStr, ok := method.(string); ok {
 			m.handleNotification(methodStr, message)
 		}
@@ -461,17 +463,17 @@ func (m *Manager) initialize(_ context.Context) error {
 	}
 
 	// Send initialize request and wait for response
-	log.Printf("Sending initialize request with ID %d", requestID)
+	m.logger.Debug("sending initialize request", "requestID", requestID)
 	response, err := m.sendRequestAndWait(initRequest)
 	if err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
-	log.Printf("Received initialize response: %+v", response)
+	m.logger.Debug("received initialize response", "response", response)
 
 	// Log server capabilities for debugging
 	if result, ok := response["result"].(map[string]any); ok {
 		if capabilities, capOk := result["capabilities"]; capOk {
-			log.Printf("gopls server capabilities: %+v", capabilities)
+			m.logger.Debug("gopls server capabilities", "capabilities", capabilities)
 		}
 	}
 
@@ -486,7 +488,7 @@ func (m *Manager) initialize(_ context.Context) error {
 		return fmt.Errorf("failed to send initialized notification: %w", err)
 	}
 
-	log.Printf("gopls initialized successfully")
+	m.logger.Info("gopls initialized successfully")
 	return nil
 }
 
@@ -503,13 +505,13 @@ func (m *Manager) sendRequest(request map[string]any) error {
 
 	// Log outgoing request for debugging
 	if method, ok := request["method"].(string); ok {
-		log.Printf("Sending LSP request: %s (id: %v)", method, request["id"])
-		log.Printf("Request data: %s", string(data))
+		m.logger.Debug("sending LSP request", "method", method, "id", request["id"])
+		m.logger.Debug("request data", "data", string(data))
 	}
 
 	// LSP uses Content-Length header format
 	message := fmt.Sprintf("Content-Length: %d\r\n\r\n%s", len(data), data)
-	log.Printf("Full message being sent: %q", message)
+	m.logger.Debug("full message being sent", "message", message)
 
 	_, err = m.stdin.Write([]byte(message))
 	if err != nil {
@@ -519,7 +521,7 @@ func (m *Manager) sendRequest(request map[string]any) error {
 	// Ensure the data is flushed
 	if flusher, ok := m.stdin.(interface{ Flush() error }); ok {
 		if err := flusher.Flush(); err != nil {
-			log.Printf("Warning: failed to flush stdin: %v", err)
+			m.logger.Warn("failed to flush stdin", "error", err)
 		}
 	}
 
@@ -540,10 +542,10 @@ func (m *Manager) routeResponse(id int, response map[string]any) {
 		case ch <- response:
 			// Response delivered
 		default:
-			log.Printf("Warning: response channel full for request %d", id)
+			m.logger.Warn("response channel full", "requestID", id)
 		}
 	} else {
-		log.Printf("Warning: received response for unknown request ID: %d", id)
+		m.logger.Warn("received response for unknown request ID", "requestID", id)
 	}
 }
 
@@ -569,7 +571,7 @@ func (m *Manager) sendRequestAndWait(request map[string]any) (map[string]any, er
 	}
 
 	// Wait for response with timeout (60s for large codebases)
-	log.Printf("Waiting for response to request %d...", id)
+	m.logger.Debug("waiting for response", "requestID", id)
 	startTime := time.Now()
 
 	// Progress ticker to show we're still waiting
@@ -580,7 +582,7 @@ func (m *Manager) sendRequestAndWait(request map[string]any) (map[string]any, er
 		select {
 		case response := <-responseCh:
 			elapsed := time.Since(startTime)
-			log.Printf("Received response to request %d after %v", id, elapsed)
+			m.logger.Debug("received response", "requestID", id, "elapsed", elapsed)
 
 			// Check for LSP error
 			if errorField, hasError := response["error"]; hasError {
@@ -593,7 +595,7 @@ func (m *Manager) sendRequestAndWait(request map[string]any) (map[string]any, er
 
 		case <-ticker.C:
 			elapsed := time.Since(startTime)
-			log.Printf("Still waiting for response to request %d (elapsed: %v)...", id, elapsed)
+			m.logger.Info("still waiting for response", "requestID", id, "elapsed", elapsed)
 
 		case <-time.After(60 * time.Second):
 			m.responsesMux.Lock()

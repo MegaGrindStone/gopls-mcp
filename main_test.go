@@ -100,7 +100,8 @@ func TestWorkspacePathParsing(t *testing.T) {
 
 func TestManagerCreation(t *testing.T) {
 	workspacePath := "/test/workspace"
-	manager := NewManager(workspacePath)
+	logger := newTestLogger()
+	manager := NewManager(workspacePath, logger)
 
 	if manager == nil {
 		t.Fatal("Expected non-nil manager")
@@ -118,7 +119,8 @@ func TestManagerCreation(t *testing.T) {
 func TestServerComponentCreation(t *testing.T) {
 	// Test that we can create the basic components without errors
 	workspacePath := "/test/workspace"
-	manager := NewManager(workspacePath)
+	logger := newTestLogger()
+	manager := NewManager(workspacePath, logger)
 
 	// Test tool creation
 	tools := []*mcp.ServerTool{
@@ -316,7 +318,8 @@ func TestTransportValidation(t *testing.T) {
 func TestSetupMCPServer(t *testing.T) {
 	// Create a test manager
 	workspacePath := "/test/workspace"
-	manager := NewManager(workspacePath)
+	logger := newTestLogger()
+	manager := NewManager(workspacePath, logger)
 
 	// Test server setup
 	server := setupMCPServer(manager)

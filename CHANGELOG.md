@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Structured Logging with slog**: Replaced standard log package with slog for structured, contextual logging
+- **Logging Configuration**: Environment variable support for log level (`LOG_LEVEL`) and format (`LOG_FORMAT`)
 - **Stdio Transport Support**: Added `-transport` flag supporting both 'http' and 'stdio' transports for full MCP specification compliance
 - **LSP Communication Improvements**: Continuous message reader, proper header parsing, request-response correlation, and timeout protection
 - **File Management**: Automatic file opening in gopls with `textDocument/didOpen` before making requests

@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 )
 
 // Position represents a position in a document.
@@ -54,7 +53,7 @@ type Hover struct {
 
 // GoToDefinition sends a textDocument/definition request to gopls.
 func (m *Manager) GoToDefinition(_ context.Context, uri string, line, character int) ([]Location, error) {
-	log.Printf("GoToDefinition called: uri=%s, line=%d, char=%d", uri, line, character)
+	m.logger.Debug("GoToDefinition called", "uri", uri, "line", line, "character", character)
 
 	if !m.IsRunning() {
 		return nil, fmt.Errorf("gopls is not running")
@@ -94,7 +93,11 @@ func (m *Manager) FindReferences(
 	line, character int,
 	includeDeclaration bool,
 ) ([]Location, error) {
-	log.Printf("FindReferences called: uri=%s, line=%d, char=%d, includeDecl=%v", uri, line, character, includeDeclaration)
+	m.logger.Debug("FindReferences called",
+		"uri", uri,
+		"line", line,
+		"character", character,
+		"includeDeclaration", includeDeclaration)
 
 	if !m.IsRunning() {
 		return nil, fmt.Errorf("gopls is not running")
@@ -134,7 +137,7 @@ func (m *Manager) FindReferences(
 
 // GetHover sends a textDocument/hover request to gopls.
 func (m *Manager) GetHover(_ context.Context, uri string, line, character int) (*Hover, error) {
-	log.Printf("GetHover called: uri=%s, line=%d, char=%d", uri, line, character)
+	m.logger.Debug("GetHover called", "uri", uri, "line", line, "character", character)
 
 	if !m.IsRunning() {
 		return nil, fmt.Errorf("gopls is not running")
