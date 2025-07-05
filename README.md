@@ -27,7 +27,7 @@ All tools work with your existing Go workspace and leverage gopls for accurate, 
 
 ### Claude Code Integration (Recommended)
 
-The easiest way to use gopls-mcp is with Claude Code using SSE transport:
+The easiest way to use gopls-mcp is with Claude Code using streamable HTTP transport:
 
 1. **Start the server** with your Go workspace:
 
@@ -43,7 +43,7 @@ The easiest way to use gopls-mcp is with Claude Code using SSE transport:
 2. **Add to Claude Code**:
 
    ```bash
-   claude mcp add --transport sse gopls-mcp http://localhost:8080/sse
+   claude mcp add --transport http gopls-mcp http://localhost:8080
    ```
 
 3. **Start using** - The Go tools will be available in your Claude Code conversations!
@@ -77,7 +77,7 @@ For VS Code and other MCP hosts, use the HTTP transport:
   "servers": {
     "gopls-mcp": {
       "type": "http",
-      "url": "http://localhost:8080/sse"
+      "url": "http://localhost:8080"
     }
   }
 }
@@ -102,7 +102,7 @@ For VS Code and other MCP hosts, use the HTTP transport:
 3. **Integrate with Claude Code**:
 
    ```bash
-   claude mcp add --transport sse gopls-mcp http://localhost:8080/sse
+   claude mcp add --transport http gopls-mcp http://localhost:8080
    ```
 
 4. **Test the integration** - Ask Claude Code to help with your Go code!
@@ -136,7 +136,7 @@ The MCP server will automatically use the appropriate tool based on your request
 ### Server Options
 
 - **`-workspace`** (required): Path to your Go workspace directory
-- **Port**: Fixed at 8080 (SSE endpoint at `/sse`)
+- **Port**: Fixed at 8080
 
 ### Workspace Requirements
 
@@ -317,7 +317,7 @@ Get documentation and type information for symbols.
 
 - Ensure the server is running on port 8080
 - Check that no other service is using the port
-- Verify the SSE endpoint is accessible at `http://localhost:8080/sse`
+- Verify the MCP server is accessible at `http://localhost:8080`
 
 ### Debug Mode
 

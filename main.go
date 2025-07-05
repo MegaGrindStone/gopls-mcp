@@ -46,14 +46,10 @@ func main() {
 		goplsManager.CreateGetHoverTool(),
 	)
 
-	// Create SSE handler
-	handler := mcp.NewSSEHandler(func(_ *http.Request) *mcp.Server {
+	// Create streamable HTTP handler
+	handler := mcp.NewStreamableHTTPHandler(func(_ *http.Request) *mcp.Server {
 		return server
-	})
-
-	// Set up HTTP server with mux
-	mux := http.NewServeMux()
-	mux.HandleFunc("/sse", handler.ServeHTTP)
+	}, nil)
 
 	// Handle graceful shutdown
 	go func() {
@@ -68,11 +64,11 @@ func main() {
 
 	log.Printf("Starting gopls-mcp server on :8080")
 	log.Printf("Workspace path: %s", *workspacePath)
-	log.Printf("SSE endpoint available at: http://localhost:8080/sse")
+	log.Printf("MCP server available at: http://localhost:8080")
 
 	httpServer := &http.Server{
 		Addr:         ":8080",
-		Handler:      mux,
+		Handler:      handler,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,

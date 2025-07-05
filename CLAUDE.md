@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Go project for implementing a Model Context Protocol (MCP) server for gopls (Go language server). The server uses SSE (Server-Sent Events) transport to provide Go language server capabilities to MCP clients like Claude.
+This is a Go project for implementing a Model Context Protocol (MCP) server for gopls (Go language server). The server uses streamable HTTP transport to provide Go language server capabilities to MCP clients like Claude.
 
 ## Development Commands
 
@@ -81,14 +81,14 @@ gh release delete v1.0.0
 - **Go Version**: 1.24.4
 - **Current State**: Fully functional MCP server with gopls integration, Docker support, and CI/CD pipeline
 - **Purpose**: MCP server for gopls integration
-- **Transport**: SSE (Server-Sent Events) over HTTP
+- **Transport**: Streamable HTTP transport
 - **Dependencies**: `github.com/modelcontextprotocol/go-sdk`
 - **Deployment**: Docker Hub (`megagrindstone/gopls-mcp`) with multi-platform support
 - **CI/CD**: GitHub Actions with comprehensive quality gates and automated Docker builds
 
 ### Key Components
 
-- **main.go**: HTTP server setup with SSE transport and MCP server initialization
+- **main.go**: HTTP server setup with streamable HTTP transport and MCP server initialization
 - **manager.go**: gopls process management, LSP client, and MCP tool handlers
 - **lsp.go**: LSP protocol types and gopls communication methods
 - **Dockerfile**: Multi-stage Docker build with gopls installation and security hardening
@@ -136,7 +136,7 @@ docker build -t gopls-mcp .
 docker run -v /path/to/go/project:/workspace -p 8080:8080 gopls-mcp
 ```
 
-The server will start on port 8080 with SSE endpoint at `http://localhost:8080/sse`.
+The server will start on port 8080 at `http://localhost:8080`.
 
 ### MCP Tool Examples
 
@@ -184,7 +184,7 @@ The server will start on port 8080 with SSE endpoint at `http://localhost:8080/s
 
 - **-workspace**: Required command-line flag to set the Go workspace path
 - **Default Port**: 8080 (hardcoded)
-- **SSE Endpoint**: `/sse`
+- **Port**: 8080 (streamable HTTP transport)
 
 ## Docker Deployment
 
@@ -213,6 +213,36 @@ The project is automatically built and published to Docker Hub at `megagrindston
 - **Volumes**: `/workspace` for Go project mounting
 - **Health Check**: HTTP endpoint monitoring
 - **Dependencies**: gopls pre-installed
+
+## LSP Communication Architecture
+
+The system implements robust LSP communication with gopls using the following components:
+
+### Message Handling
+
+- **messageReader()**: Continuous goroutine that reads all LSP messages from gopls stdout
+- **sendRequestAndWait()**: Sends LSP requests and waits for correlated responses with 60-second timeout  
+- **routeResponse()**: Routes responses to waiting request handlers by request ID
+- **readLSPMessage()**: Reads complete LSP messages with proper header parsing (`\r\n` line endings)
+- **handleLSPMessage()**: Routes messages by type (response/request/notification)
+
+### File Management
+
+The system automatically manages file context for gopls:
+
+- **ensureFileOpen()**: Opens files in gopls via `textDocument/didOpen` before making requests
+- **File Tracking**: Maintains registry of open files to avoid duplicate notifications
+- **Content Reading**: Reads file content from disk with automatic language detection
+- **Language Detection**: Supports Go files (`.go`), `go.mod`, and `go.sum` files
+
+### Workspace Readiness
+
+Ensures reliable operation with large codebases:
+
+- **Readiness Tracking**: Monitors `window/showMessage` and `$/progress` notifications from gopls
+- **Initialization Blocking**: Waits for "Finished loading packages" before allowing LSP requests
+- **Timeout Management**: 60-second timeout for LSP operations with progress logging every 10 seconds
+- **Error Handling**: Comprehensive error handling for LSP communication failures
 
 ## CI/CD Pipeline
 
@@ -248,7 +278,7 @@ Automated release pipeline (`.github/workflows/release.yaml`) that:
 
 This project implements a Model Context Protocol server that interfaces with gopls using:
 
-1. **SSE Transport**: HTTP-based communication suitable for web clients
+1. **Streamable HTTP Transport**: HTTP-based communication suitable for web clients
 2. **gopls Integration**: Subprocess management with LSP communication
 3. **MCP Tools**: Structured tools for Go language server features
 4. **Graceful Shutdown**: Proper cleanup of gopls processes
@@ -286,6 +316,13 @@ go test -v lsp_test.go
 ```
 
 ## Development Guidelines
+
+### Documentation Strategy
+
+- **CLAUDE.md**: Document the current state of the application (architecture, commands, usage)
+- **CHANGELOG.md**: Record all changes chronologically under "Unreleased" section during development
+- **Avoid Historical Sections**: Do not add dated fix descriptions to CLAUDE.md (e.g., "LSP Communication Fix (2025-07-05)")
+- **When Releasing**: Move "Unreleased" changes in CHANGELOG.md to the new version section
 
 ### Code Quality
 
