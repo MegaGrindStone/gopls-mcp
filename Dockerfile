@@ -19,14 +19,14 @@ COPY . .
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o gopls-mcp .
 
+# Install gopls in builder stage
+RUN go install golang.org/x/tools/gopls@latest
+
 # Runtime stage
-FROM golang:1.24.4-alpine AS runtime
+FROM alpine:latest AS runtime
 
 # Install runtime dependencies
 RUN apk add --no-cache ca-certificates git
-
-# Install gopls
-RUN go install golang.org/x/tools/gopls@latest
 
 # Create non-root user
 RUN addgroup -g 1001 -S gopls && \
@@ -38,8 +38,11 @@ WORKDIR /workspace
 # Copy binary from builder stage
 COPY --from=builder /app/gopls-mcp /usr/local/bin/gopls-mcp
 
-# Change ownership of the binary
-RUN chown gopls:gopls /usr/local/bin/gopls-mcp
+# Copy gopls binary from builder stage
+COPY --from=builder /go/bin/gopls /usr/local/bin/gopls
+
+# Change ownership of the binaries
+RUN chown gopls:gopls /usr/local/bin/gopls-mcp /usr/local/bin/gopls
 
 # Switch to non-root user
 USER gopls
