@@ -292,10 +292,15 @@ func (m *Manager) HandleGoToDefinition(ctx context.Context, _ *mcp.ServerSession
 		}
 	}
 
+	jsonData, err := json.Marshal(result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal result: %w", err)
+	}
+
 	return &mcp.CallToolResultFor[GoToDefinitionResult]{
 		Content: []mcp.Content{
 			&mcp.TextContent{
-				Text: fmt.Sprintf("Found %d definition(s)", len(result.Locations)),
+				Text: string(jsonData),
 			},
 		},
 	}, nil
@@ -326,10 +331,15 @@ func (m *Manager) HandleFindReferences(ctx context.Context, _ *mcp.ServerSession
 		}
 	}
 
+	jsonData, err := json.Marshal(result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal result: %w", err)
+	}
+
 	return &mcp.CallToolResultFor[FindReferencesResult]{
 		Content: []mcp.Content{
 			&mcp.TextContent{
-				Text: fmt.Sprintf("Found %d reference(s)", len(result.Locations)),
+				Text: string(jsonData),
 			},
 		},
 	}, nil
@@ -361,15 +371,15 @@ func (m *Manager) HandleGetHover(ctx context.Context, _ *mcp.ServerSession, para
 		}
 	}
 
-	contentText := "Hover information:\n"
-	for _, content := range hover.Contents {
-		contentText += content + "\n"
+	jsonData, err := json.Marshal(result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal result: %w", err)
 	}
 
 	return &mcp.CallToolResultFor[GetHoverResult]{
 		Content: []mcp.Content{
 			&mcp.TextContent{
-				Text: contentText,
+				Text: string(jsonData),
 			},
 		},
 	}, nil
