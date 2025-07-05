@@ -53,6 +53,28 @@ docker run -v /path/to/go/project:/workspace -p 8080:8080 megagrindstone/gopls-m
 docker run -v /path/to/go/project:/custom/path -p 8080:8080 megagrindstone/gopls-mcp:latest -workspace /custom/path
 ```
 
+### GitHub CLI Commands
+
+```bash
+# Create a new release with tag
+gh release create v1.0.0 --generate-notes
+
+# Create a release with manual notes
+gh release create v1.0.0 --notes "Release notes here"
+
+# Upload release assets (binaries)
+gh release upload v1.0.0 ./gopls-mcp
+
+# List existing releases
+gh release list
+
+# View specific release
+gh release view v1.0.0
+
+# Delete a release
+gh release delete v1.0.0
+```
+
 ## Architecture Notes
 
 - **Module**: `github.com/MegaGrindStone/gopls-mcp`
@@ -171,11 +193,13 @@ The server will start on port 8080 with SSE endpoint at `http://localhost:8080/s
 The project is automatically built and published to Docker Hub at `megagrindstone/gopls-mcp`.
 
 **Available Tags:**
+
 - `latest` - Latest build from main branch
 - `v*` - Semantic version tags (e.g., `v1.0.0`)
 - `main-<sha>` - Specific commit builds
 
 **Multi-platform Support:**
+
 - `linux/amd64` - Intel/AMD 64-bit
 - `linux/arm64` - ARM 64-bit (Apple Silicon, ARM servers)
 
@@ -294,3 +318,24 @@ go test -v lsp_test.go
 4. **Pull Request**: Creates quality gate checks
 5. **Merge to Main**: Triggers full CI/CD pipeline and Docker Hub push
 6. **Version Release**: Tag with `v*` for versioned Docker images
+
+### Release Process
+
+When ready to create a release:
+
+1. **Prepare Release**:
+   - Update CHANGELOG.md with new version and release notes
+   - Ensure all tests pass: `go test ./... -v -count=1 -p 1`
+   - Run linter: `golangci-lint run ./...`
+   - Build binary: `go build -o gopls-mcp`
+   - Test Docker build: `docker build -t gopls-mcp .`
+
+2. **Create Release**:
+   - Use semantic versioning (e.g., `v1.0.0`)
+   - Create release with GitHub CLI: `gh release create v1.0.0 --generate-notes`
+   - Upload binary: `gh release upload v1.0.0 ./gopls-mcp`
+
+3. **Post-Release**:
+   - GitHub Actions will automatically build and push Docker images
+   - Docker Hub will have new tags: `v1.0.0`, `latest`
+   - Release notes will be auto-generated from commit history
