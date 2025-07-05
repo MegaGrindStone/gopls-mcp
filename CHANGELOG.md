@@ -9,11 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Stdio Transport Support**: Added `-transport` flag supporting both 'http' and 'stdio' transports for full MCP specification compliance
 - **LSP Communication Improvements**: Continuous message reader, proper header parsing, request-response correlation, and timeout protection
 - **File Management**: Automatic file opening in gopls with `textDocument/didOpen` before making requests
 - **Workspace Readiness Tracking**: Monitors gopls notifications and waits for "Finished loading packages" before allowing requests
 - **Enhanced Error Handling**: Comprehensive error handling for LSP communication failures
 - **Timeout Management**: Extended LSP request timeout to 60 seconds with progress logging for large codebases
+- **Transport Tests**: Comprehensive test coverage for transport flag parsing and validation
 
 ### Changed
 

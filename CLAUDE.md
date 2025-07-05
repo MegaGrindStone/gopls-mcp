@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Go project for implementing a Model Context Protocol (MCP) server for gopls (Go language server). The server uses streamable HTTP transport to provide Go language server capabilities to MCP clients like Claude.
+This is a Go project for implementing a Model Context Protocol (MCP) server for gopls (Go language server). The server supports both HTTP and stdio transports to provide Go language server capabilities to MCP clients like Claude.
 
 ## Development Commands
 
@@ -81,14 +81,14 @@ gh release delete v1.0.0
 - **Go Version**: 1.24.4
 - **Current State**: Fully functional MCP server with gopls integration, Docker support, and CI/CD pipeline
 - **Purpose**: MCP server for gopls integration
-- **Transport**: Streamable HTTP transport
+- **Transport**: HTTP and stdio transports (MCP specification compliant)
 - **Dependencies**: `github.com/modelcontextprotocol/go-sdk`
 - **Deployment**: Docker Hub (`megagrindstone/gopls-mcp`) with multi-platform support
 - **CI/CD**: GitHub Actions with comprehensive quality gates and automated Docker builds
 
 ### Key Components
 
-- **main.go**: HTTP server setup with streamable HTTP transport and MCP server initialization
+- **main.go**: Multi-transport server setup with HTTP and stdio transport support and MCP server initialization
 - **manager.go**: gopls process management, LSP client, and MCP tool handlers
 - **lsp.go**: LSP protocol types and gopls communication methods
 - **Dockerfile**: Multi-stage Docker build with gopls installation and security hardening
@@ -115,11 +115,16 @@ gh release delete v1.0.0
 #### Native Go
 
 ```bash
-# Start server with specific workspace path (required)
+# Start server with HTTP transport (default)
 ./gopls-mcp -workspace /path/to/go/project
+./gopls-mcp -workspace /path/to/go/project -transport http
+
+# Start server with stdio transport
+./gopls-mcp -workspace /path/to/go/project -transport stdio
 
 # Or build and run with go
-go run . -workspace /path/to/go/project
+go run . -workspace /path/to/go/project -transport http
+go run . -workspace /path/to/go/project -transport stdio
 ```
 
 #### Docker
@@ -136,7 +141,7 @@ docker build -t gopls-mcp .
 docker run -v /path/to/go/project:/workspace -p 8080:8080 gopls-mcp
 ```
 
-The server will start on port 8080 at `http://localhost:8080`.
+The HTTP transport server will start on port 8080 at `http://localhost:8080`. The stdio transport communicates via standard input/output.
 
 ### MCP Tool Examples
 
@@ -183,8 +188,9 @@ The server will start on port 8080 at `http://localhost:8080`.
 ## Configuration
 
 - **-workspace**: Required command-line flag to set the Go workspace path
-- **Default Port**: 8080 (hardcoded)
-- **Port**: 8080 (streamable HTTP transport)
+- **-transport**: Transport type, accepts 'http' or 'stdio' (defaults to 'http')
+- **HTTP Transport**: Port 8080 (streamable HTTP transport)
+- **Stdio Transport**: Uses standard input/output for communication
 
 ## Docker Deployment
 
@@ -278,7 +284,7 @@ Automated release pipeline (`.github/workflows/release.yaml`) that:
 
 This project implements a Model Context Protocol server that interfaces with gopls using:
 
-1. **Streamable HTTP Transport**: HTTP-based communication suitable for web clients
+1. **Multi-Transport Support**: HTTP and stdio transports for MCP specification compliance
 2. **gopls Integration**: Subprocess management with LSP communication
 3. **MCP Tools**: Structured tools for Go language server features
 4. **Graceful Shutdown**: Proper cleanup of gopls processes
@@ -300,7 +306,7 @@ The project uses Go's standard testing package with comprehensive unit tests cov
 - **LSP Protocol Layer**: Response parsing, type conversion, and error handling
 - **Manager Component**: Lifecycle management, tool handlers, and thread safety
 - **Application Layer**: Command-line parsing, HTTP server setup, and component creation
-- **26 Total Tests**: All major functions and methods tested with success/error paths
+- **31 Total Tests**: All major functions and methods tested with success/error paths including transport functionality
 
 ### Running Tests
 
