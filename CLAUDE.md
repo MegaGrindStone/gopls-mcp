@@ -47,27 +47,26 @@ golangci-lint run ./...
 
 ### Key Components
 
-- **main.go**: HTTP server setup with SSE transport
-- **internal/gopls/**: gopls process management and LSP client
-- **internal/tools/**: MCP tool implementations for gopls features
+- **main.go**: HTTP server setup with SSE transport and MCP server initialization
+- **manager.go**: gopls process management, LSP client, and MCP tool handlers
+- **lsp.go**: LSP protocol types and gopls communication methods
 
 ### Available MCP Tools
 
-1. **ping**: Test server connectivity
-2. **go_to_definition**: Navigate to symbol definitions
-3. **find_references**: Find all references to a symbol
-4. **get_hover_info**: Get documentation and type information
+1. **go_to_definition**: Navigate to symbol definitions
+2. **find_references**: Find all references to a symbol
+3. **get_hover_info**: Get documentation and type information
 
 ## Usage Examples
 
 ### Starting the Server
 
 ```bash
-# Start server with current directory as workspace
-./gopls-mcp
+# Start server with specific workspace path (required)
+./gopls-mcp -workspace /path/to/go/project
 
-# Start server with specific workspace path
-WORKSPACE_PATH=/path/to/go/project ./gopls-mcp
+# Or build and run with go
+go run . -workspace /path/to/go/project
 ```
 
 The server will start on port 8080 with SSE endpoint at `http://localhost:8080/sse`.
@@ -116,7 +115,7 @@ The server will start on port 8080 with SSE endpoint at `http://localhost:8080/s
 
 ## Configuration
 
-- **WORKSPACE_PATH**: Environment variable to set the Go workspace path
+- **-workspace**: Required command-line flag to set the Go workspace path
 - **Default Port**: 8080 (hardcoded)
 - **SSE Endpoint**: `/sse`
 
