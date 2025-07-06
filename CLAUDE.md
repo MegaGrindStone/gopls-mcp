@@ -135,6 +135,11 @@ gh release delete v1.0.0
 9. **find_implementations**: Find concrete implementations of interfaces at the specified position
 10. **get_completions**: Provide code completion suggestions at the specified position in a Go file
 
+#### Phase 3: Advanced Navigation & Hierarchy Tools
+11. **get_call_hierarchy**: Get call hierarchy (incoming/outgoing calls) for a symbol at the specified position
+12. **get_signature_help**: Get function signature information and parameter details at the specified position
+13. **get_type_hierarchy**: Get type hierarchy (supertypes/subtypes) for a symbol at the specified position
+
 ## Usage Examples
 
 ### Starting the Server
@@ -328,6 +333,50 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
     "uri": "file:///path/to/file.go",
     "line": 10,
     "character": 5
+  }
+}
+```
+
+#### Get Call Hierarchy
+
+```json
+{
+  "name": "get_call_hierarchy",
+  "arguments": {
+    "workspace": "/path/to/workspace",
+    "uri": "file:///path/to/file.go",
+    "line": 10,
+    "character": 5,
+    "direction": "both"
+  }
+}
+```
+
+#### Get Signature Help
+
+```json
+{
+  "name": "get_signature_help",
+  "arguments": {
+    "workspace": "/path/to/workspace",
+    "uri": "file:///path/to/file.go",
+    "line": 10,
+    "character": 5
+  }
+}
+```
+
+#### Get Type Hierarchy
+
+```json
+{
+  "name": "get_type_hierarchy",
+  "arguments": {
+    "workspace": "/path/to/workspace",
+    "uri": "file:///path/to/file.go",
+    "line": 10,
+    "character": 5,
+    "direction": "both"
   }
 }
 ```

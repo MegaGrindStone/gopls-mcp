@@ -85,6 +85,15 @@ const (
 	SymbolKindTypeParameter SymbolKind = 26
 )
 
+// Direction constants for hierarchy queries.
+const (
+	DirectionIncoming   = "incoming"
+	DirectionOutgoing   = "outgoing"
+	DirectionSupertypes = "supertypes"
+	DirectionSubtypes   = "subtypes"
+	DirectionBoth       = "both"
+)
+
 // DocumentSymbol represents a symbol within a document.
 type DocumentSymbol struct {
 	Name           string           `json:"name"`
@@ -863,4 +872,634 @@ func parseCompletionsFromResponse(response map[string]any) ([]CompletionItem, er
 		}
 	}
 	return completions, nil
+}
+
+// CallHierarchyItem represents an item in a call hierarchy.
+type CallHierarchyItem struct {
+	Name           string     `json:"name"`
+	Kind           SymbolKind `json:"kind"`
+	Tags           []int      `json:"tags,omitempty"`
+	Detail         string     `json:"detail,omitempty"`
+	URI            string     `json:"uri"`
+	Range          Range      `json:"range"`
+	SelectionRange Range      `json:"selectionRange"`
+	Data           any        `json:"data,omitempty"`
+}
+
+// CallHierarchyIncomingCall represents an incoming call in call hierarchy.
+type CallHierarchyIncomingCall struct {
+	From       CallHierarchyItem `json:"from"`
+	FromRanges []Range           `json:"fromRanges"`
+}
+
+// CallHierarchyOutgoingCall represents an outgoing call in call hierarchy.
+type CallHierarchyOutgoingCall struct {
+	To         CallHierarchyItem `json:"to"`
+	FromRanges []Range           `json:"fromRanges"`
+}
+
+// SignatureHelp represents signature help information.
+type SignatureHelp struct {
+	Signatures      []SignatureInformation `json:"signatures"`
+	ActiveSignature int                    `json:"activeSignature,omitempty"`
+	ActiveParameter int                    `json:"activeParameter,omitempty"`
+}
+
+// SignatureInformation represents the signature of a callable entity.
+type SignatureInformation struct {
+	Label           string                 `json:"label"`
+	Documentation   string                 `json:"documentation,omitempty"`
+	Parameters      []ParameterInformation `json:"parameters,omitempty"`
+	ActiveParameter int                    `json:"activeParameter,omitempty"`
+}
+
+// ParameterInformation represents a parameter of a callable entity.
+type ParameterInformation struct {
+	Label         string `json:"label"`
+	Documentation string `json:"documentation,omitempty"`
+}
+
+// TypeHierarchyItem represents an item in a type hierarchy.
+type TypeHierarchyItem struct {
+	Name           string     `json:"name"`
+	Kind           SymbolKind `json:"kind"`
+	Tags           []int      `json:"tags,omitempty"`
+	Detail         string     `json:"detail,omitempty"`
+	URI            string     `json:"uri"`
+	Range          Range      `json:"range"`
+	SelectionRange Range      `json:"selectionRange"`
+	Data           any        `json:"data,omitempty"`
+}
+
+// PrepareCallHierarchy sends a textDocument/prepareCallHierarchy request to gopls.
+func (m *Manager) PrepareCallHierarchy(
+	_ context.Context, uri string, line, character int,
+) ([]CallHierarchyItem, error) {
+	m.logger.Debug("PrepareCallHierarchy called", "uri", uri, "line", line, "character", character)
+
+	if !m.IsRunning() {
+		return nil, fmt.Errorf("gopls is not running")
+	}
+
+	// Ensure file is open in gopls
+	if err := m.ensureFileOpen(uri); err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
+	}
+
+	request := map[string]any{
+		"jsonrpc": "2.0",
+		"id":      m.nextRequestID(),
+		"method":  "textDocument/prepareCallHierarchy",
+		"params": TextDocumentPositionParams{
+			TextDocument: TextDocumentIdentifier{URI: uri},
+			Position: Position{
+				Line:      line,
+				Character: character,
+			},
+		},
+	}
+
+	response, err := m.sendRequestAndWait(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare call hierarchy: %w", err)
+	}
+
+	// Extract call hierarchy items from response
+	return parseCallHierarchyItemsFromResponse(response)
+}
+
+// GetIncomingCalls sends a callHierarchy/incomingCalls request to gopls.
+func (m *Manager) GetIncomingCalls(_ context.Context, item CallHierarchyItem) ([]CallHierarchyIncomingCall, error) {
+	m.logger.Debug("GetIncomingCalls called", "item", item.Name)
+
+	if !m.IsRunning() {
+		return nil, fmt.Errorf("gopls is not running")
+	}
+
+	request := map[string]any{
+		"jsonrpc": "2.0",
+		"id":      m.nextRequestID(),
+		"method":  "callHierarchy/incomingCalls",
+		"params": map[string]any{
+			"item": item,
+		},
+	}
+
+	response, err := m.sendRequestAndWait(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get incoming calls: %w", err)
+	}
+
+	// Extract incoming calls from response
+	return parseIncomingCallsFromResponse(response)
+}
+
+// GetOutgoingCalls sends a callHierarchy/outgoingCalls request to gopls.
+func (m *Manager) GetOutgoingCalls(_ context.Context, item CallHierarchyItem) ([]CallHierarchyOutgoingCall, error) {
+	m.logger.Debug("GetOutgoingCalls called", "item", item.Name)
+
+	if !m.IsRunning() {
+		return nil, fmt.Errorf("gopls is not running")
+	}
+
+	request := map[string]any{
+		"jsonrpc": "2.0",
+		"id":      m.nextRequestID(),
+		"method":  "callHierarchy/outgoingCalls",
+		"params": map[string]any{
+			"item": item,
+		},
+	}
+
+	response, err := m.sendRequestAndWait(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get outgoing calls: %w", err)
+	}
+
+	// Extract outgoing calls from response
+	return parseOutgoingCallsFromResponse(response)
+}
+
+// GetCallHierarchy orchestrates the multi-step call hierarchy process.
+//
+//nolint:dupl // Similar pattern to GetTypeHierarchy but serves different LSP methods
+func (m *Manager) GetCallHierarchy(
+	ctx context.Context, uri string, line, character int, direction string,
+) (any, error) {
+	m.logger.Debug("GetCallHierarchy called", "uri", uri, "line", line, "character", character, "direction", direction)
+
+	// First, prepare the call hierarchy
+	items, err := m.PrepareCallHierarchy(ctx, uri, line, character)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare call hierarchy: %w", err)
+	}
+
+	if len(items) == 0 {
+		return nil, fmt.Errorf("no call hierarchy items found at position")
+	}
+
+	// Use the first item for hierarchy queries
+	item := items[0]
+
+	switch direction {
+	case DirectionIncoming:
+		return m.GetIncomingCalls(ctx, item)
+	case DirectionOutgoing:
+		return m.GetOutgoingCalls(ctx, item)
+	case DirectionBoth:
+		incoming, err := m.GetIncomingCalls(ctx, item)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get incoming calls: %w", err)
+		}
+		outgoing, err := m.GetOutgoingCalls(ctx, item)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get outgoing calls: %w", err)
+		}
+		return map[string]any{
+			DirectionIncoming: incoming,
+			DirectionOutgoing: outgoing,
+		}, nil
+	default:
+		return nil, fmt.Errorf("invalid direction: %s (must be %q, %q, or %q)", direction,
+			DirectionIncoming, DirectionOutgoing, DirectionBoth)
+	}
+}
+
+// GetSignatureHelp sends a textDocument/signatureHelp request to gopls.
+func (m *Manager) GetSignatureHelp(_ context.Context, uri string, line, character int) (*SignatureHelp, error) {
+	m.logger.Debug("GetSignatureHelp called", "uri", uri, "line", line, "character", character)
+
+	if !m.IsRunning() {
+		return nil, fmt.Errorf("gopls is not running")
+	}
+
+	// Ensure file is open in gopls
+	if err := m.ensureFileOpen(uri); err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
+	}
+
+	request := map[string]any{
+		"jsonrpc": "2.0",
+		"id":      m.nextRequestID(),
+		"method":  "textDocument/signatureHelp",
+		"params": TextDocumentPositionParams{
+			TextDocument: TextDocumentIdentifier{URI: uri},
+			Position: Position{
+				Line:      line,
+				Character: character,
+			},
+		},
+	}
+
+	response, err := m.sendRequestAndWait(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get signature help: %w", err)
+	}
+
+	// Extract signature help from response
+	return parseSignatureHelpFromResponse(response)
+}
+
+// PrepareTypeHierarchy sends a textDocument/prepareTypeHierarchy request to gopls.
+func (m *Manager) PrepareTypeHierarchy(
+	_ context.Context, uri string, line, character int,
+) ([]TypeHierarchyItem, error) {
+	m.logger.Debug("PrepareTypeHierarchy called", "uri", uri, "line", line, "character", character)
+
+	if !m.IsRunning() {
+		return nil, fmt.Errorf("gopls is not running")
+	}
+
+	// Ensure file is open in gopls
+	if err := m.ensureFileOpen(uri); err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
+	}
+
+	request := map[string]any{
+		"jsonrpc": "2.0",
+		"id":      m.nextRequestID(),
+		"method":  "textDocument/prepareTypeHierarchy",
+		"params": TextDocumentPositionParams{
+			TextDocument: TextDocumentIdentifier{URI: uri},
+			Position: Position{
+				Line:      line,
+				Character: character,
+			},
+		},
+	}
+
+	response, err := m.sendRequestAndWait(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare type hierarchy: %w", err)
+	}
+
+	// Extract type hierarchy items from response
+	return parseTypeHierarchyItemsFromResponse(response)
+}
+
+// GetSupertypes sends a typeHierarchy/supertypes request to gopls.
+func (m *Manager) GetSupertypes(_ context.Context, item TypeHierarchyItem) ([]TypeHierarchyItem, error) {
+	m.logger.Debug("GetSupertypes called", "item", item.Name)
+
+	if !m.IsRunning() {
+		return nil, fmt.Errorf("gopls is not running")
+	}
+
+	request := map[string]any{
+		"jsonrpc": "2.0",
+		"id":      m.nextRequestID(),
+		"method":  "typeHierarchy/supertypes",
+		"params": map[string]any{
+			"item": item,
+		},
+	}
+
+	response, err := m.sendRequestAndWait(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get supertypes: %w", err)
+	}
+
+	// Extract supertypes from response
+	return parseTypeHierarchyItemsFromResponse(response)
+}
+
+// GetSubtypes sends a typeHierarchy/subtypes request to gopls.
+func (m *Manager) GetSubtypes(_ context.Context, item TypeHierarchyItem) ([]TypeHierarchyItem, error) {
+	m.logger.Debug("GetSubtypes called", "item", item.Name)
+
+	if !m.IsRunning() {
+		return nil, fmt.Errorf("gopls is not running")
+	}
+
+	request := map[string]any{
+		"jsonrpc": "2.0",
+		"id":      m.nextRequestID(),
+		"method":  "typeHierarchy/subtypes",
+		"params": map[string]any{
+			"item": item,
+		},
+	}
+
+	response, err := m.sendRequestAndWait(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get subtypes: %w", err)
+	}
+
+	// Extract subtypes from response
+	return parseTypeHierarchyItemsFromResponse(response)
+}
+
+// GetTypeHierarchy orchestrates the multi-step type hierarchy process.
+//
+//nolint:dupl // Similar pattern to GetCallHierarchy but serves different LSP methods
+func (m *Manager) GetTypeHierarchy(
+	ctx context.Context, uri string, line, character int, direction string,
+) (any, error) {
+	m.logger.Debug("GetTypeHierarchy called", "uri", uri, "line", line, "character", character, "direction", direction)
+
+	// First, prepare the type hierarchy
+	items, err := m.PrepareTypeHierarchy(ctx, uri, line, character)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare type hierarchy: %w", err)
+	}
+
+	if len(items) == 0 {
+		return nil, fmt.Errorf("no type hierarchy items found at position")
+	}
+
+	// Use the first item for hierarchy queries
+	item := items[0]
+
+	switch direction {
+	case DirectionSupertypes:
+		return m.GetSupertypes(ctx, item)
+	case DirectionSubtypes:
+		return m.GetSubtypes(ctx, item)
+	case DirectionBoth:
+		supertypes, err := m.GetSupertypes(ctx, item)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get supertypes: %w", err)
+		}
+		subtypes, err := m.GetSubtypes(ctx, item)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get subtypes: %w", err)
+		}
+		return map[string]any{
+			DirectionSupertypes: supertypes,
+			DirectionSubtypes:   subtypes,
+		}, nil
+	default:
+		return nil, fmt.Errorf("invalid direction: %s (must be %q, %q, or %q)", direction,
+			DirectionSupertypes, DirectionSubtypes, DirectionBoth)
+	}
+}
+
+// parseCallHierarchyItemFromMap parses a single call hierarchy item from a map.
+//
+//nolint:dupl // Similar structure to parseTypeHierarchyItemFromMap but handles different types
+func parseCallHierarchyItemFromMap(itemMap map[string]any) CallHierarchyItem {
+	var item CallHierarchyItem
+
+	if name, nameOk := itemMap["name"].(string); nameOk {
+		item.Name = name
+	}
+	if kind, kindOk := itemMap["kind"].(float64); kindOk {
+		item.Kind = SymbolKind(int(kind))
+	}
+	if detail, detailOk := itemMap["detail"].(string); detailOk {
+		item.Detail = detail
+	}
+	if uri, uriOk := itemMap["uri"].(string); uriOk {
+		item.URI = uri
+	}
+	if rangeMap, rangeMapOk := itemMap["range"].(map[string]any); rangeMapOk {
+		item.Range = parseRange(rangeMap)
+	}
+	if selectionRangeMap, selectionRangeMapOk := itemMap["selectionRange"].(map[string]any); selectionRangeMapOk {
+		item.SelectionRange = parseRange(selectionRangeMap)
+	}
+	if tags, tagsOk := itemMap["tags"].([]any); tagsOk {
+		for _, tag := range tags {
+			if tagFloat, tagFloatOk := tag.(float64); tagFloatOk {
+				item.Tags = append(item.Tags, int(tagFloat))
+			}
+		}
+	}
+	if data, dataOk := itemMap["data"]; dataOk {
+		item.Data = data
+	}
+
+	return item
+}
+
+// parseCallHierarchyItemsFromResponse extracts call hierarchy items from LSP response.
+func parseCallHierarchyItemsFromResponse(response map[string]any) ([]CallHierarchyItem, error) {
+	result, resultOk := response["result"]
+	if !resultOk {
+		return nil, fmt.Errorf("invalid response format")
+	}
+
+	items, itemsOk := result.([]any)
+	if !itemsOk {
+		return nil, fmt.Errorf("invalid response format")
+	}
+
+	var callHierarchyItems []CallHierarchyItem
+	for _, item := range items {
+		if itemMap, itemMapOk := item.(map[string]any); itemMapOk {
+			callHierarchyItem := parseCallHierarchyItemFromMap(itemMap)
+			callHierarchyItems = append(callHierarchyItems, callHierarchyItem)
+		}
+	}
+	return callHierarchyItems, nil
+}
+
+// parseIncomingCallFromMap parses a single incoming call from a map.
+func parseIncomingCallFromMap(callMap map[string]any) CallHierarchyIncomingCall {
+	var call CallHierarchyIncomingCall
+
+	if from, fromOk := callMap["from"].(map[string]any); fromOk {
+		call.From = parseCallHierarchyItemFromMap(from)
+	}
+	if fromRanges, fromRangesOk := callMap["fromRanges"].([]any); fromRangesOk {
+		for _, rangeData := range fromRanges {
+			if rangeMap, rangeMapOk := rangeData.(map[string]any); rangeMapOk {
+				call.FromRanges = append(call.FromRanges, parseRange(rangeMap))
+			}
+		}
+	}
+
+	return call
+}
+
+// parseIncomingCallsFromResponse extracts incoming calls from LSP response.
+func parseIncomingCallsFromResponse(response map[string]any) ([]CallHierarchyIncomingCall, error) {
+	result, resultOk := response["result"]
+	if !resultOk {
+		return nil, fmt.Errorf("invalid response format")
+	}
+
+	calls, callsOk := result.([]any)
+	if !callsOk {
+		return nil, fmt.Errorf("invalid response format")
+	}
+
+	var incomingCalls []CallHierarchyIncomingCall
+	for _, call := range calls {
+		if callMap, callMapOk := call.(map[string]any); callMapOk {
+			incomingCall := parseIncomingCallFromMap(callMap)
+			incomingCalls = append(incomingCalls, incomingCall)
+		}
+	}
+	return incomingCalls, nil
+}
+
+// parseOutgoingCallFromMap parses a single outgoing call from a map.
+func parseOutgoingCallFromMap(callMap map[string]any) CallHierarchyOutgoingCall {
+	var call CallHierarchyOutgoingCall
+
+	if to, toOk := callMap["to"].(map[string]any); toOk {
+		call.To = parseCallHierarchyItemFromMap(to)
+	}
+	if fromRanges, fromRangesOk := callMap["fromRanges"].([]any); fromRangesOk {
+		for _, rangeData := range fromRanges {
+			if rangeMap, rangeMapOk := rangeData.(map[string]any); rangeMapOk {
+				call.FromRanges = append(call.FromRanges, parseRange(rangeMap))
+			}
+		}
+	}
+
+	return call
+}
+
+// parseOutgoingCallsFromResponse extracts outgoing calls from LSP response.
+func parseOutgoingCallsFromResponse(response map[string]any) ([]CallHierarchyOutgoingCall, error) {
+	result, resultOk := response["result"]
+	if !resultOk {
+		return nil, fmt.Errorf("invalid response format")
+	}
+
+	calls, callsOk := result.([]any)
+	if !callsOk {
+		return nil, fmt.Errorf("invalid response format")
+	}
+
+	var outgoingCalls []CallHierarchyOutgoingCall
+	for _, call := range calls {
+		if callMap, callMapOk := call.(map[string]any); callMapOk {
+			outgoingCall := parseOutgoingCallFromMap(callMap)
+			outgoingCalls = append(outgoingCalls, outgoingCall)
+		}
+	}
+	return outgoingCalls, nil
+}
+
+// parseParameterInformationFromMap parses a single parameter information from a map.
+func parseParameterInformationFromMap(paramMap map[string]any) ParameterInformation {
+	var param ParameterInformation
+
+	if label, labelOk := paramMap["label"].(string); labelOk {
+		param.Label = label
+	}
+	if documentation, docOk := paramMap["documentation"].(string); docOk {
+		param.Documentation = documentation
+	}
+
+	return param
+}
+
+// parseSignatureInformationFromMap parses a single signature information from a map.
+func parseSignatureInformationFromMap(sigMap map[string]any) SignatureInformation {
+	var sig SignatureInformation
+
+	if label, labelOk := sigMap["label"].(string); labelOk {
+		sig.Label = label
+	}
+	if documentation, docOk := sigMap["documentation"].(string); docOk {
+		sig.Documentation = documentation
+	}
+	if activeParameter, activeParameterOk := sigMap["activeParameter"].(float64); activeParameterOk {
+		sig.ActiveParameter = int(activeParameter)
+	}
+	if parameters, parametersOk := sigMap["parameters"].([]any); parametersOk {
+		for _, param := range parameters {
+			if paramMap, paramMapOk := param.(map[string]any); paramMapOk {
+				parameter := parseParameterInformationFromMap(paramMap)
+				sig.Parameters = append(sig.Parameters, parameter)
+			}
+		}
+	}
+
+	return sig
+}
+
+// parseSignatureHelpFromResponse extracts signature help from LSP response.
+func parseSignatureHelpFromResponse(response map[string]any) (*SignatureHelp, error) {
+	result, resultOk := response["result"]
+	if !resultOk {
+		return nil, fmt.Errorf("invalid response format")
+	}
+
+	sigHelpMap, sigHelpMapOk := result.(map[string]any)
+	if !sigHelpMapOk {
+		return nil, fmt.Errorf("invalid signature help response format")
+	}
+
+	var sigHelp SignatureHelp
+	if activeSignature, activeSignatureOk := sigHelpMap["activeSignature"].(float64); activeSignatureOk {
+		sigHelp.ActiveSignature = int(activeSignature)
+	}
+	if activeParameter, activeParameterOk := sigHelpMap["activeParameter"].(float64); activeParameterOk {
+		sigHelp.ActiveParameter = int(activeParameter)
+	}
+	if signatures, signaturesOk := sigHelpMap["signatures"].([]any); signaturesOk {
+		for _, sig := range signatures {
+			if sigMap, sigMapOk := sig.(map[string]any); sigMapOk {
+				signature := parseSignatureInformationFromMap(sigMap)
+				sigHelp.Signatures = append(sigHelp.Signatures, signature)
+			}
+		}
+	}
+
+	return &sigHelp, nil
+}
+
+// parseTypeHierarchyItemFromMap parses a single type hierarchy item from a map.
+//
+//nolint:dupl // Similar structure to parseCallHierarchyItemFromMap but handles different types
+func parseTypeHierarchyItemFromMap(itemMap map[string]any) TypeHierarchyItem {
+	var item TypeHierarchyItem
+
+	if name, nameOk := itemMap["name"].(string); nameOk {
+		item.Name = name
+	}
+	if kind, kindOk := itemMap["kind"].(float64); kindOk {
+		item.Kind = SymbolKind(int(kind))
+	}
+	if detail, detailOk := itemMap["detail"].(string); detailOk {
+		item.Detail = detail
+	}
+	if uri, uriOk := itemMap["uri"].(string); uriOk {
+		item.URI = uri
+	}
+	if rangeMap, rangeMapOk := itemMap["range"].(map[string]any); rangeMapOk {
+		item.Range = parseRange(rangeMap)
+	}
+	if selectionRangeMap, selectionRangeMapOk := itemMap["selectionRange"].(map[string]any); selectionRangeMapOk {
+		item.SelectionRange = parseRange(selectionRangeMap)
+	}
+	if tags, tagsOk := itemMap["tags"].([]any); tagsOk {
+		for _, tag := range tags {
+			if tagFloat, tagFloatOk := tag.(float64); tagFloatOk {
+				item.Tags = append(item.Tags, int(tagFloat))
+			}
+		}
+	}
+	if data, dataOk := itemMap["data"]; dataOk {
+		item.Data = data
+	}
+
+	return item
+}
+
+// parseTypeHierarchyItemsFromResponse extracts type hierarchy items from LSP response.
+func parseTypeHierarchyItemsFromResponse(response map[string]any) ([]TypeHierarchyItem, error) {
+	result, resultOk := response["result"]
+	if !resultOk {
+		return nil, fmt.Errorf("invalid response format")
+	}
+
+	items, itemsOk := result.([]any)
+	if !itemsOk {
+		return nil, fmt.Errorf("invalid response format")
+	}
+
+	var typeHierarchyItems []TypeHierarchyItem
+	for _, item := range items {
+		if itemMap, itemMapOk := item.(map[string]any); itemMapOk {
+			typeHierarchyItem := parseTypeHierarchyItemFromMap(itemMap)
+			typeHierarchyItems = append(typeHierarchyItems, typeHierarchyItem)
+		}
+	}
+	return typeHierarchyItems, nil
 }

@@ -20,11 +20,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `get_diagnostics`: Retrieves compile errors, warnings, and static analysis results for Go files
   - `find_implementations`: Finds concrete implementations of interfaces at specified positions
   - `get_completions`: Provides context-aware code completion suggestions at cursor positions
-- **LSP Method Integration**: Added support for `textDocument/documentSymbol`, `workspace/symbol`, `textDocument/typeDefinition`, `textDocument/diagnostic`, `textDocument/implementation`, and `textDocument/completion` LSP methods
+- **Phase 3 Advanced Navigation & Hierarchy MCP Tools**: Three sophisticated navigation and hierarchy tools:
+  - `get_call_hierarchy`: Shows incoming and outgoing function calls with multi-step LSP operations
+  - `get_signature_help`: Displays function parameter information and documentation during function calls
+  - `get_type_hierarchy`: Shows interface and implementation type relationships with supertype/subtype navigation
+- **LSP Method Integration**: Added support for `textDocument/documentSymbol`, `workspace/symbol`, `textDocument/typeDefinition`, `textDocument/diagnostic`, `textDocument/implementation`, `textDocument/completion`, `textDocument/prepareCallHierarchy`, `callHierarchy/incomingCalls`, `callHierarchy/outgoingCalls`, `textDocument/signatureHelp`, `textDocument/prepareTypeHierarchy`, `typeHierarchy/supertypes`, and `typeHierarchy/subtypes` LSP methods
 - **Symbol Type Definitions**: Complete LSP symbol type system including `SymbolKind` constants, `DocumentSymbol`, and `SymbolInformation` types
 - **Diagnostic Type System**: Full diagnostic support with `DiagnosticSeverity` (error, warning, info, hint) and `DiagnosticTag` types
 - **Completion Type System**: Comprehensive completion support with `CompletionItemKind` constants and `CompletionItem` metadata
-- **Enhanced MCP Response Types**: New structured response types for document symbols, workspace symbols, type definitions, diagnostics, implementations, and completions
+- **Call Hierarchy Type System**: Complete call hierarchy support with `CallHierarchyItem`, `CallHierarchyIncomingCall`, and `CallHierarchyOutgoingCall` types for multi-step LSP operations
+- **Signature Help Type System**: Function signature support with `SignatureHelp`, `SignatureInformation`, and `ParameterInformation` types for context-aware parameter assistance
+- **Type Hierarchy Type System**: Type relationship support with `TypeHierarchyItem` for supertype/subtype navigation and interface satisfaction visualization
+- **Enhanced MCP Response Types**: New structured response types for document symbols, workspace symbols, type definitions, diagnostics, implementations, completions, call hierarchies, signature help, and type hierarchies
 - **Workspace Routing**: Intelligent request routing based on workspace parameter in MCP tool calls
 - **Enhanced Docker Support**: Multi-workspace Docker deployment with multiple volume mount examples
 - **Comprehensive Testing Coverage**: 53 tests covering single workspace, multiple workspaces, workspace management, navigation tools, and code quality analysis
@@ -42,7 +49,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `get_diagnostics` requires `workspace` field
   - `find_implementations` requires `workspace` field
   - `get_completions` requires `workspace` field
-- **MCP Server Enhancement**: Expanded from 4 to 10 total MCP tools for comprehensive Go code navigation, discovery, and quality analysis
+  - `get_call_hierarchy` requires `workspace` field
+  - `get_signature_help` requires `workspace` field
+  - `get_type_hierarchy` requires `workspace` field
+- **MCP Server Enhancement**: Expanded from 4 to 13 total MCP tools for comprehensive Go code navigation, discovery, quality analysis, and advanced hierarchy exploration
 - **BREAKING**: No backward compatibility - old single-workspace usage patterns no longer supported
 - Updated Dockerfile CMD to use `-workspaces` flag instead of `-workspace`
 - Enhanced documentation with multi-workspace usage examples and Docker deployment patterns

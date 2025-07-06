@@ -782,6 +782,32 @@ type GetCompletionsParams struct {
 	Character int    `json:"character"`
 }
 
+// GetCallHierarchyParams represents parameters for get call hierarchy requests.
+type GetCallHierarchyParams struct {
+	Workspace string `json:"workspace"`
+	URI       string `json:"uri"`
+	Line      int    `json:"line"`
+	Character int    `json:"character"`
+	Direction string `json:"direction"` // "incoming", "outgoing", or "both"
+}
+
+// GetSignatureHelpParams represents parameters for get signature help requests.
+type GetSignatureHelpParams struct {
+	Workspace string `json:"workspace"`
+	URI       string `json:"uri"`
+	Line      int    `json:"line"`
+	Character int    `json:"character"`
+}
+
+// GetTypeHierarchyParams represents parameters for get type hierarchy requests.
+type GetTypeHierarchyParams struct {
+	Workspace string `json:"workspace"`
+	URI       string `json:"uri"`
+	Line      int    `json:"line"`
+	Character int    `json:"character"`
+	Direction string `json:"direction"` // "supertypes", "subtypes", or "both"
+}
+
 // LocationResult represents a location result.
 type LocationResult struct {
 	URI          string `json:"uri"`
@@ -894,6 +920,75 @@ type CompletionItemResult struct {
 // GetCompletionsResult represents the result of a get completions request.
 type GetCompletionsResult struct {
 	Items []CompletionItemResult `json:"items"`
+}
+
+// CallHierarchyItemResult represents a call hierarchy item for MCP response.
+type CallHierarchyItemResult struct {
+	Name           string         `json:"name"`
+	Kind           int            `json:"kind"`
+	Tags           []int          `json:"tags,omitempty"`
+	Detail         string         `json:"detail,omitempty"`
+	URI            string         `json:"uri"`
+	Range          LocationResult `json:"range"`
+	SelectionRange LocationResult `json:"selectionRange"`
+}
+
+// CallHierarchyIncomingCallResult represents an incoming call for MCP response.
+type CallHierarchyIncomingCallResult struct {
+	From       CallHierarchyItemResult `json:"from"`
+	FromRanges []LocationResult        `json:"fromRanges"`
+}
+
+// CallHierarchyOutgoingCallResult represents an outgoing call for MCP response.
+type CallHierarchyOutgoingCallResult struct {
+	To         CallHierarchyItemResult `json:"to"`
+	FromRanges []LocationResult        `json:"fromRanges"`
+}
+
+// GetCallHierarchyResult represents the result of a get call hierarchy request.
+type GetCallHierarchyResult struct {
+	Direction     string                            `json:"direction"`
+	IncomingCalls []CallHierarchyIncomingCallResult `json:"incomingCalls,omitempty"`
+	OutgoingCalls []CallHierarchyOutgoingCallResult `json:"outgoingCalls,omitempty"`
+}
+
+// ParameterInformationResult represents parameter information for MCP response.
+type ParameterInformationResult struct {
+	Label         string `json:"label"`
+	Documentation string `json:"documentation,omitempty"`
+}
+
+// SignatureInformationResult represents signature information for MCP response.
+type SignatureInformationResult struct {
+	Label           string                       `json:"label"`
+	Documentation   string                       `json:"documentation,omitempty"`
+	Parameters      []ParameterInformationResult `json:"parameters,omitempty"`
+	ActiveParameter int                          `json:"activeParameter,omitempty"`
+}
+
+// GetSignatureHelpResult represents the result of a get signature help request.
+type GetSignatureHelpResult struct {
+	Signatures      []SignatureInformationResult `json:"signatures"`
+	ActiveSignature int                          `json:"activeSignature,omitempty"`
+	ActiveParameter int                          `json:"activeParameter,omitempty"`
+}
+
+// TypeHierarchyItemResult represents a type hierarchy item for MCP response.
+type TypeHierarchyItemResult struct {
+	Name           string         `json:"name"`
+	Kind           int            `json:"kind"`
+	Tags           []int          `json:"tags,omitempty"`
+	Detail         string         `json:"detail,omitempty"`
+	URI            string         `json:"uri"`
+	Range          LocationResult `json:"range"`
+	SelectionRange LocationResult `json:"selectionRange"`
+}
+
+// GetTypeHierarchyResult represents the result of a get type hierarchy request.
+type GetTypeHierarchyResult struct {
+	Direction  string                    `json:"direction"`
+	Supertypes []TypeHierarchyItemResult `json:"supertypes,omitempty"`
+	Subtypes   []TypeHierarchyItemResult `json:"subtypes,omitempty"`
 }
 
 // MCP tool handlers
@@ -1352,6 +1447,186 @@ func (wm *WorkspaceManager) HandleGetCompletions(
 	}, nil
 }
 
+// HandleGetCallHierarchy handles get call hierarchy requests for WorkspaceManager.
+//
+//nolint:dupl // Similar pattern to HandleGetTypeHierarchy but handles different MCP tools
+func (wm *WorkspaceManager) HandleGetCallHierarchy(
+	ctx context.Context,
+	_ *mcp.ServerSession,
+	params *mcp.CallToolParamsFor[GetCallHierarchyParams],
+) (*mcp.CallToolResultFor[GetCallHierarchyResult], error) {
+	// Get the appropriate manager for the workspace
+	manager, err := wm.GetManager(params.Arguments.Workspace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get manager for workspace: %w", err)
+	}
+
+	if !manager.IsRunning() {
+		return nil, fmt.Errorf("gopls is not running for workspace: %s", params.Arguments.Workspace)
+	}
+
+	// Get call hierarchy from manager
+	hierarchyData, err := manager.GetCallHierarchy(
+		ctx,
+		params.Arguments.URI,
+		params.Arguments.Line,
+		params.Arguments.Character,
+		params.Arguments.Direction,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get call hierarchy: %w", err)
+	}
+
+	// Convert the result based on direction
+	result := GetCallHierarchyResult{
+		Direction: params.Arguments.Direction,
+	}
+
+	switch params.Arguments.Direction {
+	case "incoming":
+		if incomingCalls, ok := hierarchyData.([]CallHierarchyIncomingCall); ok {
+			result.IncomingCalls = convertIncomingCallsToMCP(incomingCalls)
+		}
+	case "outgoing":
+		if outgoingCalls, ok := hierarchyData.([]CallHierarchyOutgoingCall); ok {
+			result.OutgoingCalls = convertOutgoingCallsToMCP(outgoingCalls)
+		}
+	case "both":
+		if bothData, ok := hierarchyData.(map[string]any); ok {
+			if incoming, incomingOk := bothData["incoming"].([]CallHierarchyIncomingCall); incomingOk {
+				result.IncomingCalls = convertIncomingCallsToMCP(incoming)
+			}
+			if outgoing, outgoingOk := bothData["outgoing"].([]CallHierarchyOutgoingCall); outgoingOk {
+				result.OutgoingCalls = convertOutgoingCallsToMCP(outgoing)
+			}
+		}
+	}
+
+	jsonData, err := json.Marshal(result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal result: %w", err)
+	}
+
+	return &mcp.CallToolResultFor[GetCallHierarchyResult]{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: string(jsonData),
+			},
+		},
+	}, nil
+}
+
+// HandleGetSignatureHelp handles get signature help requests for WorkspaceManager.
+func (wm *WorkspaceManager) HandleGetSignatureHelp(
+	ctx context.Context,
+	_ *mcp.ServerSession,
+	params *mcp.CallToolParamsFor[GetSignatureHelpParams],
+) (*mcp.CallToolResultFor[GetSignatureHelpResult], error) {
+	// Get the appropriate manager for the workspace
+	manager, err := wm.GetManager(params.Arguments.Workspace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get manager for workspace: %w", err)
+	}
+
+	if !manager.IsRunning() {
+		return nil, fmt.Errorf("gopls is not running for workspace: %s", params.Arguments.Workspace)
+	}
+
+	signatureHelp, err := manager.GetSignatureHelp(
+		ctx, params.Arguments.URI, params.Arguments.Line, params.Arguments.Character)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get signature help: %w", err)
+	}
+
+	result := GetSignatureHelpResult{
+		ActiveSignature: signatureHelp.ActiveSignature,
+		ActiveParameter: signatureHelp.ActiveParameter,
+		Signatures:      convertSignaturesToMCP(signatureHelp.Signatures),
+	}
+
+	jsonData, err := json.Marshal(result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal result: %w", err)
+	}
+
+	return &mcp.CallToolResultFor[GetSignatureHelpResult]{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: string(jsonData),
+			},
+		},
+	}, nil
+}
+
+// HandleGetTypeHierarchy handles get type hierarchy requests for WorkspaceManager.
+//
+//nolint:dupl // Similar pattern to HandleGetCallHierarchy but handles different MCP tools
+func (wm *WorkspaceManager) HandleGetTypeHierarchy(
+	ctx context.Context,
+	_ *mcp.ServerSession,
+	params *mcp.CallToolParamsFor[GetTypeHierarchyParams],
+) (*mcp.CallToolResultFor[GetTypeHierarchyResult], error) {
+	// Get the appropriate manager for the workspace
+	manager, err := wm.GetManager(params.Arguments.Workspace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get manager for workspace: %w", err)
+	}
+
+	if !manager.IsRunning() {
+		return nil, fmt.Errorf("gopls is not running for workspace: %s", params.Arguments.Workspace)
+	}
+
+	// Get type hierarchy from manager
+	hierarchyData, err := manager.GetTypeHierarchy(
+		ctx,
+		params.Arguments.URI,
+		params.Arguments.Line,
+		params.Arguments.Character,
+		params.Arguments.Direction,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get type hierarchy: %w", err)
+	}
+
+	// Convert the result based on direction
+	result := GetTypeHierarchyResult{
+		Direction: params.Arguments.Direction,
+	}
+
+	switch params.Arguments.Direction {
+	case "supertypes":
+		if supertypes, ok := hierarchyData.([]TypeHierarchyItem); ok {
+			result.Supertypes = convertTypeHierarchyItemsToMCP(supertypes)
+		}
+	case "subtypes":
+		if subtypes, ok := hierarchyData.([]TypeHierarchyItem); ok {
+			result.Subtypes = convertTypeHierarchyItemsToMCP(subtypes)
+		}
+	case "both":
+		if bothData, ok := hierarchyData.(map[string]any); ok {
+			if supertypes, supertypesOk := bothData["supertypes"].([]TypeHierarchyItem); supertypesOk {
+				result.Supertypes = convertTypeHierarchyItemsToMCP(supertypes)
+			}
+			if subtypes, subtypesOk := bothData["subtypes"].([]TypeHierarchyItem); subtypesOk {
+				result.Subtypes = convertTypeHierarchyItemsToMCP(subtypes)
+			}
+		}
+	}
+
+	jsonData, err := json.Marshal(result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal result: %w", err)
+	}
+
+	return &mcp.CallToolResultFor[GetTypeHierarchyResult]{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: string(jsonData),
+			},
+		},
+	}, nil
+}
+
 // Helper functions to convert LSP types to MCP result types
 
 // convertDocumentSymbolToMCP converts a DocumentSymbol to DocumentSymbolResult.
@@ -1479,6 +1754,150 @@ func convertCompletionsToMCP(items []CompletionItem) []CompletionItemResult {
 	var results []CompletionItemResult
 	for _, item := range items {
 		results = append(results, convertCompletionItemToMCP(item))
+	}
+	return results
+}
+
+// convertCallHierarchyItemToMCP converts a CallHierarchyItem to CallHierarchyItemResult.
+func convertCallHierarchyItemToMCP(item CallHierarchyItem) CallHierarchyItemResult {
+	return CallHierarchyItemResult{
+		Name:   item.Name,
+		Kind:   int(item.Kind),
+		Tags:   item.Tags,
+		Detail: item.Detail,
+		URI:    item.URI,
+		Range: LocationResult{
+			URI:          item.URI,
+			Line:         item.Range.Start.Line,
+			Character:    item.Range.Start.Character,
+			EndLine:      item.Range.End.Line,
+			EndCharacter: item.Range.End.Character,
+		},
+		SelectionRange: LocationResult{
+			URI:          item.URI,
+			Line:         item.SelectionRange.Start.Line,
+			Character:    item.SelectionRange.Start.Character,
+			EndLine:      item.SelectionRange.End.Line,
+			EndCharacter: item.SelectionRange.End.Character,
+		},
+	}
+}
+
+// convertIncomingCallToMCP converts a CallHierarchyIncomingCall to CallHierarchyIncomingCallResult.
+func convertIncomingCallToMCP(call CallHierarchyIncomingCall) CallHierarchyIncomingCallResult {
+	result := CallHierarchyIncomingCallResult{
+		From: convertCallHierarchyItemToMCP(call.From),
+	}
+
+	for _, rng := range call.FromRanges {
+		result.FromRanges = append(result.FromRanges, LocationResult{
+			URI:          call.From.URI,
+			Line:         rng.Start.Line,
+			Character:    rng.Start.Character,
+			EndLine:      rng.End.Line,
+			EndCharacter: rng.End.Character,
+		})
+	}
+
+	return result
+}
+
+// convertIncomingCallsToMCP converts a slice of CallHierarchyIncomingCall to CallHierarchyIncomingCallResult.
+func convertIncomingCallsToMCP(calls []CallHierarchyIncomingCall) []CallHierarchyIncomingCallResult {
+	var results []CallHierarchyIncomingCallResult
+	for _, call := range calls {
+		results = append(results, convertIncomingCallToMCP(call))
+	}
+	return results
+}
+
+// convertOutgoingCallToMCP converts a CallHierarchyOutgoingCall to CallHierarchyOutgoingCallResult.
+func convertOutgoingCallToMCP(call CallHierarchyOutgoingCall) CallHierarchyOutgoingCallResult {
+	result := CallHierarchyOutgoingCallResult{
+		To: convertCallHierarchyItemToMCP(call.To),
+	}
+
+	for _, rng := range call.FromRanges {
+		result.FromRanges = append(result.FromRanges, LocationResult{
+			URI:          call.To.URI,
+			Line:         rng.Start.Line,
+			Character:    rng.Start.Character,
+			EndLine:      rng.End.Line,
+			EndCharacter: rng.End.Character,
+		})
+	}
+
+	return result
+}
+
+// convertOutgoingCallsToMCP converts a slice of CallHierarchyOutgoingCall to CallHierarchyOutgoingCallResult.
+func convertOutgoingCallsToMCP(calls []CallHierarchyOutgoingCall) []CallHierarchyOutgoingCallResult {
+	var results []CallHierarchyOutgoingCallResult
+	for _, call := range calls {
+		results = append(results, convertOutgoingCallToMCP(call))
+	}
+	return results
+}
+
+// convertParameterInformationToMCP converts a ParameterInformation to ParameterInformationResult.
+func convertParameterInformationToMCP(param ParameterInformation) ParameterInformationResult {
+	return ParameterInformationResult(param)
+}
+
+// convertSignatureInformationToMCP converts a SignatureInformation to SignatureInformationResult.
+func convertSignatureInformationToMCP(sig SignatureInformation) SignatureInformationResult {
+	result := SignatureInformationResult{
+		Label:           sig.Label,
+		Documentation:   sig.Documentation,
+		ActiveParameter: sig.ActiveParameter,
+	}
+
+	for _, param := range sig.Parameters {
+		result.Parameters = append(result.Parameters, convertParameterInformationToMCP(param))
+	}
+
+	return result
+}
+
+// convertSignaturesToMCP converts a slice of SignatureInformation to SignatureInformationResult.
+func convertSignaturesToMCP(signatures []SignatureInformation) []SignatureInformationResult {
+	var results []SignatureInformationResult
+	for _, sig := range signatures {
+		results = append(results, convertSignatureInformationToMCP(sig))
+	}
+	return results
+}
+
+// convertTypeHierarchyItemToMCP converts a TypeHierarchyItem to TypeHierarchyItemResult.
+func convertTypeHierarchyItemToMCP(item TypeHierarchyItem) TypeHierarchyItemResult {
+	return TypeHierarchyItemResult{
+		Name:   item.Name,
+		Kind:   int(item.Kind),
+		Tags:   item.Tags,
+		Detail: item.Detail,
+		URI:    item.URI,
+		Range: LocationResult{
+			URI:          item.URI,
+			Line:         item.Range.Start.Line,
+			Character:    item.Range.Start.Character,
+			EndLine:      item.Range.End.Line,
+			EndCharacter: item.Range.End.Character,
+		},
+		SelectionRange: LocationResult{
+			URI:          item.URI,
+			Line:         item.SelectionRange.Start.Line,
+			Character:    item.SelectionRange.Start.Character,
+			EndLine:      item.SelectionRange.End.Line,
+			EndCharacter: item.SelectionRange.End.Character,
+		},
+	}
+}
+
+// convertTypeHierarchyItemsToMCP converts a slice of TypeHierarchyItem to TypeHierarchyItemResult.
+func convertTypeHierarchyItemsToMCP(items []TypeHierarchyItem) []TypeHierarchyItemResult {
+	var results []TypeHierarchyItemResult
+	for _, item := range items {
+		results = append(results, convertTypeHierarchyItemToMCP(item))
 	}
 	return results
 }
@@ -1623,6 +2042,53 @@ func (wm *WorkspaceManager) CreateGetCompletionsTool() *mcp.ServerTool {
 			mcp.Property("uri", mcp.Description("File URI (e.g., file:///path/to/file.go)"), mcp.Required(true)),
 			mcp.Property("line", mcp.Description("Line number (0-based)"), mcp.Required(true)),
 			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
+		),
+	)
+}
+
+// CreateGetCallHierarchyTool creates the get call hierarchy MCP tool for WorkspaceManager.
+func (wm *WorkspaceManager) CreateGetCallHierarchyTool() *mcp.ServerTool {
+	return mcp.NewServerTool[GetCallHierarchyParams, GetCallHierarchyResult](
+		"get_call_hierarchy",
+		"Get call hierarchy (incoming/outgoing calls) for a symbol at the specified position in a Go file",
+		wm.HandleGetCallHierarchy,
+		mcp.Input(
+			mcp.Property("workspace", mcp.Description("Workspace path"), mcp.Required(true)),
+			mcp.Property("uri", mcp.Description("File URI (e.g., file:///path/to/file.go)"), mcp.Required(true)),
+			mcp.Property("line", mcp.Description("Line number (0-based)"), mcp.Required(true)),
+			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
+			mcp.Property("direction", mcp.Description("Direction: 'incoming', 'outgoing', or 'both'"), mcp.Required(true)),
+		),
+	)
+}
+
+// CreateGetSignatureHelpTool creates the get signature help MCP tool for WorkspaceManager.
+func (wm *WorkspaceManager) CreateGetSignatureHelpTool() *mcp.ServerTool {
+	return mcp.NewServerTool[GetSignatureHelpParams, GetSignatureHelpResult](
+		"get_signature_help",
+		"Get function signature information and parameter details at the specified position in a Go file",
+		wm.HandleGetSignatureHelp,
+		mcp.Input(
+			mcp.Property("workspace", mcp.Description("Workspace path"), mcp.Required(true)),
+			mcp.Property("uri", mcp.Description("File URI (e.g., file:///path/to/file.go)"), mcp.Required(true)),
+			mcp.Property("line", mcp.Description("Line number (0-based)"), mcp.Required(true)),
+			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
+		),
+	)
+}
+
+// CreateGetTypeHierarchyTool creates the get type hierarchy MCP tool for WorkspaceManager.
+func (wm *WorkspaceManager) CreateGetTypeHierarchyTool() *mcp.ServerTool {
+	return mcp.NewServerTool[GetTypeHierarchyParams, GetTypeHierarchyResult](
+		"get_type_hierarchy",
+		"Get type hierarchy (supertypes/subtypes) for a symbol at the specified position in a Go file",
+		wm.HandleGetTypeHierarchy,
+		mcp.Input(
+			mcp.Property("workspace", mcp.Description("Workspace path"), mcp.Required(true)),
+			mcp.Property("uri", mcp.Description("File URI (e.g., file:///path/to/file.go)"), mcp.Required(true)),
+			mcp.Property("line", mcp.Description("Line number (0-based)"), mcp.Required(true)),
+			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
+			mcp.Property("direction", mcp.Description("Direction: 'supertypes', 'subtypes', or 'both'"), mcp.Required(true)),
 		),
 	)
 }
