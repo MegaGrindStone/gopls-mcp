@@ -11,8 +11,11 @@ This is a Go project for implementing a Model Context Protocol (MCP) server for 
 ### Standard Go Commands
 
 ```bash
-# Run the application
-go run main.go
+# Run the application with multiple workspaces
+go run main.go -workspaces /path/workspace1,/path/workspace2
+
+# Run the application with single workspace
+go run main.go -workspaces /path/workspace
 
 # Build the application
 go build -o gopls-mcp
@@ -42,15 +45,26 @@ golangci-lint run ./...
 # Build Docker image locally
 docker build -t gopls-mcp .
 
-# Run with Docker (mount your Go project)
+# Run with Docker (single workspace)
 docker run -v /path/to/go/project:/workspace -p 8080:8080 megagrindstone/gopls-mcp:latest
 
-# Run from Docker Hub
+# Run with multiple workspaces (mount multiple volumes)
+docker run \
+  -v /path/to/workspace1:/workspace1 \
+  -v /path/to/workspace2:/workspace2 \
+  -p 8080:8080 \
+  megagrindstone/gopls-mcp:latest -workspaces /workspace1,/workspace2
+
+# Run from Docker Hub (single workspace)
 docker pull megagrindstone/gopls-mcp:latest
 docker run -v /path/to/go/project:/workspace -p 8080:8080 megagrindstone/gopls-mcp:latest
 
-# Run with custom workspace path
-docker run -v /path/to/go/project:/custom/path -p 8080:8080 megagrindstone/gopls-mcp:latest -workspace /custom/path
+# Run with custom workspace paths
+docker run \
+  -v /path/to/project1:/custom/path1 \
+  -v /path/to/project2:/custom/path2 \
+  -p 8080:8080 \
+  megagrindstone/gopls-mcp:latest -workspaces /custom/path1,/custom/path2
 ```
 
 ### GitHub CLI Commands
@@ -79,17 +93,18 @@ gh release delete v1.0.0
 
 - **Module**: `github.com/MegaGrindStone/gopls-mcp`
 - **Go Version**: 1.24.4
-- **Current State**: Fully functional MCP server with gopls integration, Docker support, and CI/CD pipeline
-- **Purpose**: MCP server for gopls integration
+- **Current State**: Fully functional multi-workspace MCP server with gopls integration, Docker support, and CI/CD pipeline
+- **Purpose**: Multi-workspace MCP server for gopls integration
 - **Transport**: HTTP and stdio transports (MCP specification compliant)
 - **Dependencies**: `github.com/modelcontextprotocol/go-sdk`
 - **Deployment**: Docker Hub (`megagrindstone/gopls-mcp`) with multi-platform support
 - **CI/CD**: GitHub Actions with comprehensive quality gates and automated Docker builds
+- **Multi-Workspace**: Supports multiple Go workspaces simultaneously with dedicated gopls processes
 
 ### Key Components
 
 - **main.go**: Multi-transport server setup with HTTP and stdio transport support and MCP server initialization
-- **manager.go**: gopls process management, LSP client, and MCP tool handlers
+- **manager.go**: WorkspaceManager for multi-workspace coordination, gopls process management, LSP client, and MCP tool handlers
 - **lsp.go**: LSP protocol types and gopls communication methods
 - **logger.go**: Structured logging initialization with slog and environment variable configuration
 - **test_helpers.go**: Testing utilities including reduced-verbosity logger for tests
@@ -109,6 +124,7 @@ gh release delete v1.0.0
 1. **go_to_definition**: Navigate to symbol definitions
 2. **find_references**: Find all references to a symbol
 3. **get_hover_info**: Get documentation and type information
+4. **list_workspaces**: List all available workspaces and their status
 
 ## Usage Examples
 
@@ -117,38 +133,60 @@ gh release delete v1.0.0
 #### Native Go
 
 ```bash
-# Start server with HTTP transport (default)
-./gopls-mcp -workspace /path/to/go/project
-./gopls-mcp -workspace /path/to/go/project -transport http
+# Start server with single workspace (HTTP transport - default)
+./gopls-mcp -workspaces /path/to/go/project
+./gopls-mcp -workspaces /path/to/go/project -transport http
+
+# Start server with multiple workspaces
+./gopls-mcp -workspaces /path/to/workspace1,/path/to/workspace2
+./gopls-mcp -workspaces /path/to/workspace1,/path/to/workspace2 -transport http
 
 # Start server with stdio transport
-./gopls-mcp -workspace /path/to/go/project -transport stdio
+./gopls-mcp -workspaces /path/to/go/project -transport stdio
 
 # Or build and run with go
-go run . -workspace /path/to/go/project -transport http
-go run . -workspace /path/to/go/project -transport stdio
+go run . -workspaces /path/to/go/project -transport http
+go run . -workspaces /path/to/workspace1,/path/to/workspace2 -transport stdio
 
 # With logging configuration
-LOG_LEVEL=DEBUG ./gopls-mcp -workspace /path/to/go/project
-LOG_FORMAT=json LOG_LEVEL=WARN ./gopls-mcp -workspace /path/to/go/project
+LOG_LEVEL=DEBUG ./gopls-mcp -workspaces /path/to/go/project
+LOG_FORMAT=json LOG_LEVEL=WARN ./gopls-mcp -workspaces /path/to/workspace1,/path/to/workspace2
 ```
 
 #### Docker
 
 ```bash
-# Quick start with Docker Hub image
+# Quick start with Docker Hub image (single workspace)
 docker run -v /path/to/go/project:/workspace -p 8080:8080 megagrindstone/gopls-mcp:latest
 
-# With custom workspace path
-docker run -v /path/to/go/project:/custom/path -p 8080:8080 megagrindstone/gopls-mcp:latest -workspace /custom/path
+# Multiple workspaces with Docker
+docker run \
+  -v /path/to/workspace1:/workspace1 \
+  -v /path/to/workspace2:/workspace2 \
+  -p 8080:8080 \
+  megagrindstone/gopls-mcp:latest -workspaces /workspace1,/workspace2
+
+# With custom workspace paths
+docker run \
+  -v /path/to/project1:/custom/path1 \
+  -v /path/to/project2:/custom/path2 \
+  -p 8080:8080 \
+  megagrindstone/gopls-mcp:latest -workspaces /custom/path1,/custom/path2
 
 # Local development with built image
 docker build -t gopls-mcp .
 docker run -v /path/to/go/project:/workspace -p 8080:8080 gopls-mcp
 
-# With logging configuration
+# With logging configuration (single workspace)
 docker run -e LOG_LEVEL=DEBUG -v /path/to/go/project:/workspace -p 8080:8080 megagrindstone/gopls-mcp:latest
-docker run -e LOG_FORMAT=json -e LOG_LEVEL=INFO -v /path/to/go/project:/workspace -p 8080:8080 megagrindstone/gopls-mcp:latest
+
+# With logging configuration (multiple workspaces)
+docker run \
+  -e LOG_FORMAT=json -e LOG_LEVEL=INFO \
+  -v /path/to/workspace1:/workspace1 \
+  -v /path/to/workspace2:/workspace2 \
+  -p 8080:8080 \
+  megagrindstone/gopls-mcp:latest -workspaces /workspace1,/workspace2
 ```
 
 The HTTP transport server will start on port 8080 at `http://localhost:8080`. The stdio transport communicates via standard input/output.
@@ -161,6 +199,7 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
 {
   "name": "go_to_definition",
   "arguments": {
+    "workspace": "/path/to/workspace",
     "uri": "file:///path/to/file.go",
     "line": 10,
     "character": 5
@@ -174,6 +213,7 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
 {
   "name": "find_references",
   "arguments": {
+    "workspace": "/path/to/workspace",
     "uri": "file:///path/to/file.go",
     "line": 10,
     "character": 5,
@@ -188,6 +228,7 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
 {
   "name": "get_hover_info",
   "arguments": {
+    "workspace": "/path/to/workspace",
     "uri": "file:///path/to/file.go",
     "line": 10,
     "character": 5
@@ -195,11 +236,20 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
 }
 ```
 
+#### List Workspaces
+
+```json
+{
+  "name": "list_workspaces",
+  "arguments": {}
+}
+```
+
 ## Configuration
 
 ### Command-line Flags
 
-- **-workspace**: Required command-line flag to set the Go workspace path
+- **-workspaces**: Required command-line flag to set Go workspace paths (comma-separated list)
 - **-transport**: Transport type, accepts 'http' or 'stdio' (defaults to 'http')
 
 ### Environment Variables
@@ -211,6 +261,35 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
 
 - **HTTP Transport**: Port 8080 (streamable HTTP transport)
 - **Stdio Transport**: Uses standard input/output for communication
+
+## Multi-Workspace Architecture
+
+The gopls-mcp server supports multiple Go workspaces simultaneously through the WorkspaceManager component:
+
+### Key Features
+
+- **Multiple Workspaces**: Support for multiple Go projects in a single server instance
+- **Isolated gopls Processes**: Each workspace gets its own dedicated gopls process
+- **Workspace Routing**: MCP tools route requests to the appropriate workspace based on the workspace parameter
+- **Centralized Management**: Single HTTP/stdio endpoint manages all workspaces
+- **Workspace Discovery**: Use the `list_workspaces` tool to see all available workspaces and their status
+
+### WorkspaceManager Component
+
+The `WorkspaceManager` component coordinates multiple `Manager` instances:
+
+- **Workspace Creation**: Automatically creates a `Manager` for each specified workspace path
+- **Lifecycle Management**: Starts/stops all workspace gopls processes together
+- **Request Routing**: Routes MCP tool calls to the correct workspace Manager
+- **Status Monitoring**: Tracks the running status of all workspace gopls processes
+- **Error Handling**: Provides clear error messages for invalid workspace requests
+
+### Usage Benefits
+
+- **Reduced Docker Instances**: Handle multiple Go projects without deploying multiple containers
+- **Resource Efficiency**: Shared HTTP server and MCP infrastructure across workspaces
+- **Simplified Management**: Single endpoint for multiple Go projects
+- **Workspace Isolation**: Each workspace maintains independent gopls state
 
 ## Docker Deployment
 

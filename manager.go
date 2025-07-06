@@ -608,10 +608,111 @@ func (m *Manager) sendRequestAndWait(request map[string]any) (map[string]any, er
 	}
 }
 
+// WorkspaceManager manages multiple workspace Managers.
+type WorkspaceManager struct {
+	managers map[string]*Manager // workspace path -> Manager
+	mu       sync.RWMutex
+	logger   *slog.Logger
+}
+
+// NewWorkspaceManager creates a new WorkspaceManager.
+func NewWorkspaceManager(workspacePaths []string, logger *slog.Logger) *WorkspaceManager {
+	wm := &WorkspaceManager{
+		managers: make(map[string]*Manager),
+		logger:   logger,
+	}
+
+	for _, path := range workspacePaths {
+		wm.managers[path] = NewManager(path, logger)
+	}
+
+	return wm
+}
+
+// Start starts all workspace managers.
+func (wm *WorkspaceManager) Start(ctx context.Context) error {
+	wm.mu.Lock()
+	defer wm.mu.Unlock()
+
+	var startErrors []string
+	for workspace, manager := range wm.managers {
+		if err := manager.Start(ctx); err != nil {
+			startErrors = append(startErrors, fmt.Sprintf("workspace %s: %v", workspace, err))
+		}
+	}
+
+	if len(startErrors) > 0 {
+		return fmt.Errorf("failed to start workspaces: %s", strings.Join(startErrors, "; "))
+	}
+
+	wm.logger.Info("all workspaces started successfully", "count", len(wm.managers))
+	return nil
+}
+
+// Stop stops all workspace managers.
+func (wm *WorkspaceManager) Stop() error {
+	wm.mu.Lock()
+	defer wm.mu.Unlock()
+
+	var stopErrors []string
+	for workspace, manager := range wm.managers {
+		if err := manager.Stop(); err != nil {
+			stopErrors = append(stopErrors, fmt.Sprintf("workspace %s: %v", workspace, err))
+		}
+	}
+
+	if len(stopErrors) > 0 {
+		return fmt.Errorf("failed to stop workspaces: %s", strings.Join(stopErrors, "; "))
+	}
+
+	wm.logger.Info("all workspaces stopped successfully")
+	return nil
+}
+
+// GetManager returns the manager for the specified workspace.
+func (wm *WorkspaceManager) GetManager(workspace string) (*Manager, error) {
+	wm.mu.RLock()
+	defer wm.mu.RUnlock()
+
+	manager, exists := wm.managers[workspace]
+	if !exists {
+		return nil, fmt.Errorf("workspace not found: %s", workspace)
+	}
+
+	return manager, nil
+}
+
+// GetWorkspaces returns all workspace paths.
+func (wm *WorkspaceManager) GetWorkspaces() []string {
+	wm.mu.RLock()
+	defer wm.mu.RUnlock()
+
+	workspaces := make([]string, 0, len(wm.managers))
+	for workspace := range wm.managers {
+		workspaces = append(workspaces, workspace)
+	}
+
+	return workspaces
+}
+
+// GetWorkspaceStatus returns the status of all workspaces.
+func (wm *WorkspaceManager) GetWorkspaceStatus() map[string]bool {
+	wm.mu.RLock()
+	defer wm.mu.RUnlock()
+
+	status := make(map[string]bool)
+	for workspace, manager := range wm.managers {
+		status[workspace] = manager.IsRunning()
+	}
+
+	return status
+}
+
 // MCP tool parameter types
 
 // GoToDefinitionParams represents parameters for go to definition requests.
 type GoToDefinitionParams struct {
+	Workspace string `json:"workspace"`
 	URI       string `json:"uri"`
 	Line      int    `json:"line"`
 	Character int    `json:"character"`
@@ -619,6 +720,7 @@ type GoToDefinitionParams struct {
 
 // FindReferencesParams represents parameters for find references requests.
 type FindReferencesParams struct {
+	Workspace          string `json:"workspace"`
 	URI                string `json:"uri"`
 	Line               int    `json:"line"`
 	Character          int    `json:"character"`
@@ -627,9 +729,15 @@ type FindReferencesParams struct {
 
 // GetHoverParams represents parameters for get hover info requests.
 type GetHoverParams struct {
+	Workspace string `json:"workspace"`
 	URI       string `json:"uri"`
 	Line      int    `json:"line"`
 	Character int    `json:"character"`
+}
+
+// ListWorkspacesParams represents parameters for list workspaces requests.
+type ListWorkspacesParams struct {
+	// No parameters needed for this tool
 }
 
 // LocationResult represents a location result.
@@ -658,19 +766,36 @@ type GetHoverResult struct {
 	Range    *LocationResult `json:"range,omitempty"`
 }
 
+// WorkspaceInfo represents information about a workspace.
+type WorkspaceInfo struct {
+	Path      string `json:"path"`
+	IsRunning bool   `json:"isRunning"`
+}
+
+// ListWorkspacesResult represents the result of a list workspaces request.
+type ListWorkspacesResult struct {
+	Workspaces []WorkspaceInfo `json:"workspaces"`
+}
+
 // MCP tool handlers
 
-// HandleGoToDefinition handles go to definition requests.
-func (m *Manager) HandleGoToDefinition(
+// HandleGoToDefinition handles go to definition requests for WorkspaceManager.
+func (wm *WorkspaceManager) HandleGoToDefinition(
 	ctx context.Context,
 	_ *mcp.ServerSession,
 	params *mcp.CallToolParamsFor[GoToDefinitionParams],
 ) (*mcp.CallToolResultFor[GoToDefinitionResult], error) {
-	if !m.IsRunning() {
-		return nil, fmt.Errorf("gopls is not running")
+	// Get the appropriate manager for the workspace
+	manager, err := wm.GetManager(params.Arguments.Workspace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get manager for workspace: %w", err)
 	}
 
-	locations, err := m.GoToDefinition(ctx, params.Arguments.URI, params.Arguments.Line, params.Arguments.Character)
+	if !manager.IsRunning() {
+		return nil, fmt.Errorf("gopls is not running for workspace: %s", params.Arguments.Workspace)
+	}
+
+	locations, err := manager.GoToDefinition(ctx, params.Arguments.URI, params.Arguments.Line, params.Arguments.Character)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get definition: %w", err)
 	}
@@ -703,17 +828,23 @@ func (m *Manager) HandleGoToDefinition(
 	}, nil
 }
 
-// HandleFindReferences handles find references requests.
-func (m *Manager) HandleFindReferences(
+// HandleFindReferences handles find references requests for WorkspaceManager.
+func (wm *WorkspaceManager) HandleFindReferences(
 	ctx context.Context,
 	_ *mcp.ServerSession,
 	params *mcp.CallToolParamsFor[FindReferencesParams],
 ) (*mcp.CallToolResultFor[FindReferencesResult], error) {
-	if !m.IsRunning() {
-		return nil, fmt.Errorf("gopls is not running")
+	// Get the appropriate manager for the workspace
+	manager, err := wm.GetManager(params.Arguments.Workspace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get manager for workspace: %w", err)
 	}
 
-	locations, err := m.FindReferences(
+	if !manager.IsRunning() {
+		return nil, fmt.Errorf("gopls is not running for workspace: %s", params.Arguments.Workspace)
+	}
+
+	locations, err := manager.FindReferences(
 		ctx,
 		params.Arguments.URI,
 		params.Arguments.Line,
@@ -752,17 +883,23 @@ func (m *Manager) HandleFindReferences(
 	}, nil
 }
 
-// HandleGetHover handles get hover info requests.
-func (m *Manager) HandleGetHover(
+// HandleGetHover handles get hover info requests for WorkspaceManager.
+func (wm *WorkspaceManager) HandleGetHover(
 	ctx context.Context,
 	_ *mcp.ServerSession,
 	params *mcp.CallToolParamsFor[GetHoverParams],
 ) (*mcp.CallToolResultFor[GetHoverResult], error) {
-	if !m.IsRunning() {
-		return nil, fmt.Errorf("gopls is not running")
+	// Get the appropriate manager for the workspace
+	manager, err := wm.GetManager(params.Arguments.Workspace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get manager for workspace: %w", err)
 	}
 
-	hover, err := m.GetHover(ctx, params.Arguments.URI, params.Arguments.Line, params.Arguments.Character)
+	if !manager.IsRunning() {
+		return nil, fmt.Errorf("gopls is not running for workspace: %s", params.Arguments.Workspace)
+	}
+
+	hover, err := manager.GetHover(ctx, params.Arguments.URI, params.Arguments.Line, params.Arguments.Character)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get hover info: %w", err)
 	}
@@ -796,15 +933,49 @@ func (m *Manager) HandleGetHover(
 	}, nil
 }
 
-// MCP tool creation methods
+// HandleListWorkspaces handles list workspaces requests for WorkspaceManager.
+func (wm *WorkspaceManager) HandleListWorkspaces(
+	_ context.Context,
+	_ *mcp.ServerSession,
+	_ *mcp.CallToolParamsFor[ListWorkspacesParams],
+) (*mcp.CallToolResultFor[ListWorkspacesResult], error) {
+	status := wm.GetWorkspaceStatus()
 
-// CreateGoToDefinitionTool creates the go to definition MCP tool.
-func (m *Manager) CreateGoToDefinitionTool() *mcp.ServerTool {
+	result := ListWorkspacesResult{
+		Workspaces: make([]WorkspaceInfo, 0, len(status)),
+	}
+
+	for workspace, isRunning := range status {
+		result.Workspaces = append(result.Workspaces, WorkspaceInfo{
+			Path:      workspace,
+			IsRunning: isRunning,
+		})
+	}
+
+	jsonData, err := json.Marshal(result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal result: %w", err)
+	}
+
+	return &mcp.CallToolResultFor[ListWorkspacesResult]{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: string(jsonData),
+			},
+		},
+	}, nil
+}
+
+// MCP tool creation methods for WorkspaceManager
+
+// CreateGoToDefinitionTool creates the go to definition MCP tool for WorkspaceManager.
+func (wm *WorkspaceManager) CreateGoToDefinitionTool() *mcp.ServerTool {
 	return mcp.NewServerTool[GoToDefinitionParams, GoToDefinitionResult](
 		"go_to_definition",
 		"Navigate to the definition of a symbol at the specified position in a Go file",
-		m.HandleGoToDefinition,
+		wm.HandleGoToDefinition,
 		mcp.Input(
+			mcp.Property("workspace", mcp.Description("Workspace path"), mcp.Required(true)),
 			mcp.Property("uri", mcp.Description("File URI (e.g., file:///path/to/file.go)"), mcp.Required(true)),
 			mcp.Property("line", mcp.Description("Line number (0-based)"), mcp.Required(true)),
 			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
@@ -812,13 +983,14 @@ func (m *Manager) CreateGoToDefinitionTool() *mcp.ServerTool {
 	)
 }
 
-// CreateFindReferencesTool creates the find references MCP tool.
-func (m *Manager) CreateFindReferencesTool() *mcp.ServerTool {
+// CreateFindReferencesTool creates the find references MCP tool for WorkspaceManager.
+func (wm *WorkspaceManager) CreateFindReferencesTool() *mcp.ServerTool {
 	return mcp.NewServerTool[FindReferencesParams, FindReferencesResult](
 		"find_references",
 		"Find all references to a symbol at the specified position in a Go file",
-		m.HandleFindReferences,
+		wm.HandleFindReferences,
 		mcp.Input(
+			mcp.Property("workspace", mcp.Description("Workspace path"), mcp.Required(true)),
 			mcp.Property("uri", mcp.Description("File URI (e.g., file:///path/to/file.go)"), mcp.Required(true)),
 			mcp.Property("line", mcp.Description("Line number (0-based)"), mcp.Required(true)),
 			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
@@ -827,16 +999,29 @@ func (m *Manager) CreateFindReferencesTool() *mcp.ServerTool {
 	)
 }
 
-// CreateGetHoverTool creates the get hover info MCP tool.
-func (m *Manager) CreateGetHoverTool() *mcp.ServerTool {
+// CreateGetHoverTool creates the get hover info MCP tool for WorkspaceManager.
+func (wm *WorkspaceManager) CreateGetHoverTool() *mcp.ServerTool {
 	return mcp.NewServerTool[GetHoverParams, GetHoverResult](
 		"get_hover_info",
 		"Get hover information (documentation, type info) for a symbol at the specified position",
-		m.HandleGetHover,
+		wm.HandleGetHover,
 		mcp.Input(
+			mcp.Property("workspace", mcp.Description("Workspace path"), mcp.Required(true)),
 			mcp.Property("uri", mcp.Description("File URI (e.g., file:///path/to/file.go)"), mcp.Required(true)),
 			mcp.Property("line", mcp.Description("Line number (0-based)"), mcp.Required(true)),
 			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
+		),
+	)
+}
+
+// CreateListWorkspacesTool creates the list workspaces MCP tool for WorkspaceManager.
+func (wm *WorkspaceManager) CreateListWorkspacesTool() *mcp.ServerTool {
+	return mcp.NewServerTool[ListWorkspacesParams, ListWorkspacesResult](
+		"list_workspaces",
+		"List all available workspaces and their status",
+		wm.HandleListWorkspaces,
+		mcp.Input(
+		// No input parameters needed
 		),
 	)
 }

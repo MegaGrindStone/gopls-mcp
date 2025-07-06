@@ -57,4 +57,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 
 # Set entrypoint
 ENTRYPOINT ["/usr/local/bin/gopls-mcp"]
-CMD ["-workspace", "/workspace"]
+CMD ["-workspaces", "/workspace"]
