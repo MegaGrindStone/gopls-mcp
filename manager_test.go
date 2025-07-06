@@ -1282,3 +1282,536 @@ func TestWorkspaceManagerCreatePhase2Tools(t *testing.T) {
 		t.Error("CreateGetCompletionsTool() returned nil")
 	}
 }
+
+// Tests for Phase 3 parameter types.
+func TestGetCallHierarchyParams(t *testing.T) {
+	params := GetCallHierarchyParams{
+		Workspace: "/test/workspace",
+		URI:       "file:///test.go",
+		Line:      10,
+		Character: 5,
+		Direction: "incoming",
+	}
+
+	// Test JSON marshaling
+	data, err := json.Marshal(params)
+	if err != nil {
+		t.Errorf("json.Marshal(GetCallHierarchyParams) error = %v", err)
+	}
+
+	// Test JSON unmarshaling
+	var unmarshaled GetCallHierarchyParams
+	err = json.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Errorf("json.Unmarshal(GetCallHierarchyParams) error = %v", err)
+	}
+
+	if unmarshaled.Workspace != params.Workspace {
+		t.Errorf("JSON roundtrip failed: got workspace=%v, want %v", unmarshaled.Workspace, params.Workspace)
+	}
+	if unmarshaled.Direction != params.Direction {
+		t.Errorf("JSON roundtrip failed: got direction=%v, want %v", unmarshaled.Direction, params.Direction)
+	}
+	if unmarshaled.Line != params.Line {
+		t.Errorf("JSON roundtrip failed: got line=%v, want %v", unmarshaled.Line, params.Line)
+	}
+	if unmarshaled.Character != params.Character {
+		t.Errorf("JSON roundtrip failed: got character=%v, want %v", unmarshaled.Character, params.Character)
+	}
+}
+
+func TestGetSignatureHelpParams(t *testing.T) {
+	params := GetSignatureHelpParams{
+		Workspace: "/test/workspace",
+		URI:       "file:///test.go",
+		Line:      10,
+		Character: 5,
+	}
+
+	// Test JSON marshaling
+	data, err := json.Marshal(params)
+	if err != nil {
+		t.Errorf("json.Marshal(GetSignatureHelpParams) error = %v", err)
+	}
+
+	// Test JSON unmarshaling
+	var unmarshaled GetSignatureHelpParams
+	err = json.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Errorf("json.Unmarshal(GetSignatureHelpParams) error = %v", err)
+	}
+
+	if unmarshaled.Workspace != params.Workspace {
+		t.Errorf("JSON roundtrip failed: got workspace=%v, want %v", unmarshaled.Workspace, params.Workspace)
+	}
+	if unmarshaled.Line != params.Line {
+		t.Errorf("JSON roundtrip failed: got line=%v, want %v", unmarshaled.Line, params.Line)
+	}
+	if unmarshaled.Character != params.Character {
+		t.Errorf("JSON roundtrip failed: got character=%v, want %v", unmarshaled.Character, params.Character)
+	}
+}
+
+func TestGetTypeHierarchyParams(t *testing.T) {
+	params := GetTypeHierarchyParams{
+		Workspace: "/test/workspace",
+		URI:       "file:///test.go",
+		Line:      10,
+		Character: 5,
+		Direction: "supertypes",
+	}
+
+	// Test JSON marshaling
+	data, err := json.Marshal(params)
+	if err != nil {
+		t.Errorf("json.Marshal(GetTypeHierarchyParams) error = %v", err)
+	}
+
+	// Test JSON unmarshaling
+	var unmarshaled GetTypeHierarchyParams
+	err = json.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Errorf("json.Unmarshal(GetTypeHierarchyParams) error = %v", err)
+	}
+
+	if unmarshaled.Workspace != params.Workspace {
+		t.Errorf("JSON roundtrip failed: got workspace=%v, want %v", unmarshaled.Workspace, params.Workspace)
+	}
+	if unmarshaled.Direction != params.Direction {
+		t.Errorf("JSON roundtrip failed: got direction=%v, want %v", unmarshaled.Direction, params.Direction)
+	}
+	if unmarshaled.Line != params.Line {
+		t.Errorf("JSON roundtrip failed: got line=%v, want %v", unmarshaled.Line, params.Line)
+	}
+	if unmarshaled.Character != params.Character {
+		t.Errorf("JSON roundtrip failed: got character=%v, want %v", unmarshaled.Character, params.Character)
+	}
+}
+
+// Tests for Phase 3 result types.
+func TestCallHierarchyItemResult(t *testing.T) {
+	result := CallHierarchyItemResult{
+		Name:   "TestFunction",
+		Kind:   12, // Function
+		Detail: "func TestFunction()",
+		URI:    "file:///test.go",
+		Range: LocationResult{
+			URI:          "file:///test.go",
+			Line:         10,
+			Character:    0,
+			EndLine:      15,
+			EndCharacter: 1,
+		},
+		SelectionRange: LocationResult{
+			URI:          "file:///test.go",
+			Line:         10,
+			Character:    5,
+			EndLine:      10,
+			EndCharacter: 17,
+		},
+	}
+
+	// Test JSON marshaling
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Errorf("json.Marshal(CallHierarchyItemResult) error = %v", err)
+	}
+
+	// Test JSON unmarshaling
+	var unmarshaled CallHierarchyItemResult
+	err = json.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Errorf("json.Unmarshal(CallHierarchyItemResult) error = %v", err)
+	}
+
+	if unmarshaled.Name != result.Name {
+		t.Errorf("JSON roundtrip failed: got name=%v, want %v", unmarshaled.Name, result.Name)
+	}
+	if unmarshaled.Kind != result.Kind {
+		t.Errorf("JSON roundtrip failed: got kind=%v, want %v", unmarshaled.Kind, result.Kind)
+	}
+	if unmarshaled.URI != result.URI {
+		t.Errorf("JSON roundtrip failed: got uri=%v, want %v", unmarshaled.URI, result.URI)
+	}
+}
+
+func TestCallHierarchyIncomingCallResult(t *testing.T) {
+	result := CallHierarchyIncomingCallResult{
+		From: CallHierarchyItemResult{
+			Name: "CallerFunction",
+			Kind: 12, // Function
+			URI:  "file:///caller.go",
+		},
+		FromRanges: []LocationResult{
+			{
+				URI:          "file:///caller.go",
+				Line:         7,
+				Character:    4,
+				EndLine:      7,
+				EndCharacter: 16,
+			},
+		},
+	}
+
+	// Test JSON marshaling
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Errorf("json.Marshal(CallHierarchyIncomingCallResult) error = %v", err)
+	}
+
+	// Test JSON unmarshaling
+	var unmarshaled CallHierarchyIncomingCallResult
+	err = json.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Errorf("json.Unmarshal(CallHierarchyIncomingCallResult) error = %v", err)
+	}
+
+	if unmarshaled.From.Name != result.From.Name {
+		t.Errorf("JSON roundtrip failed: got from.name=%v, want %v", unmarshaled.From.Name, result.From.Name)
+	}
+	if len(unmarshaled.FromRanges) != len(result.FromRanges) {
+		t.Errorf("JSON roundtrip failed: got %d from ranges, want %d", len(unmarshaled.FromRanges), len(result.FromRanges))
+	}
+}
+
+func TestGetCallHierarchyResult(t *testing.T) {
+	result := GetCallHierarchyResult{
+		Direction: "incoming",
+		IncomingCalls: []CallHierarchyIncomingCallResult{
+			{
+				From: CallHierarchyItemResult{
+					Name: "CallerFunction",
+					Kind: 12, // Function
+					URI:  "file:///caller.go",
+				},
+			},
+		},
+	}
+
+	// Test JSON marshaling
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Errorf("json.Marshal(GetCallHierarchyResult) error = %v", err)
+	}
+
+	// Test JSON unmarshaling
+	var unmarshaled GetCallHierarchyResult
+	err = json.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Errorf("json.Unmarshal(GetCallHierarchyResult) error = %v", err)
+	}
+
+	if unmarshaled.Direction != result.Direction {
+		t.Errorf("JSON roundtrip failed: got direction=%v, want %v", unmarshaled.Direction, result.Direction)
+	}
+	if len(unmarshaled.IncomingCalls) != len(result.IncomingCalls) {
+		t.Errorf("JSON roundtrip failed: got %d incoming calls, want %d",
+			len(unmarshaled.IncomingCalls), len(result.IncomingCalls))
+	}
+}
+
+func TestParameterInformationResult(t *testing.T) {
+	result := ParameterInformationResult{
+		Label:         "param1 string",
+		Documentation: "First parameter",
+	}
+
+	// Test JSON marshaling
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Errorf("json.Marshal(ParameterInformationResult) error = %v", err)
+	}
+
+	// Test JSON unmarshaling
+	var unmarshaled ParameterInformationResult
+	err = json.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Errorf("json.Unmarshal(ParameterInformationResult) error = %v", err)
+	}
+
+	if unmarshaled.Label != result.Label {
+		t.Errorf("JSON roundtrip failed: got label=%v, want %v", unmarshaled.Label, result.Label)
+	}
+	if unmarshaled.Documentation != result.Documentation {
+		t.Errorf("JSON roundtrip failed: got documentation=%v, want %v", unmarshaled.Documentation, result.Documentation)
+	}
+}
+
+func TestSignatureInformationResult(t *testing.T) {
+	result := SignatureInformationResult{
+		Label:         "TestFunction(param1 string, param2 int) error",
+		Documentation: "TestFunction performs a test operation",
+		Parameters: []ParameterInformationResult{
+			{
+				Label:         "param1 string",
+				Documentation: "First parameter",
+			},
+		},
+	}
+
+	// Test JSON marshaling
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Errorf("json.Marshal(SignatureInformationResult) error = %v", err)
+	}
+
+	// Test JSON unmarshaling
+	var unmarshaled SignatureInformationResult
+	err = json.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Errorf("json.Unmarshal(SignatureInformationResult) error = %v", err)
+	}
+
+	if unmarshaled.Label != result.Label {
+		t.Errorf("JSON roundtrip failed: got label=%v, want %v", unmarshaled.Label, result.Label)
+	}
+	if len(unmarshaled.Parameters) != len(result.Parameters) {
+		t.Errorf("JSON roundtrip failed: got %d parameters, want %d", len(unmarshaled.Parameters), len(result.Parameters))
+	}
+}
+
+func TestGetSignatureHelpResult(t *testing.T) {
+	result := GetSignatureHelpResult{
+		Signatures: []SignatureInformationResult{
+			{
+				Label:         "TestFunction(param1 string, param2 int) error",
+				Documentation: "TestFunction performs a test operation",
+			},
+		},
+		ActiveSignature: 0,
+		ActiveParameter: 1,
+	}
+
+	// Test JSON marshaling
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Errorf("json.Marshal(GetSignatureHelpResult) error = %v", err)
+	}
+
+	// Test JSON unmarshaling
+	var unmarshaled GetSignatureHelpResult
+	err = json.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Errorf("json.Unmarshal(GetSignatureHelpResult) error = %v", err)
+	}
+
+	if len(unmarshaled.Signatures) != len(result.Signatures) {
+		t.Errorf("JSON roundtrip failed: got %d signatures, want %d", len(unmarshaled.Signatures), len(result.Signatures))
+	}
+	if unmarshaled.ActiveSignature != result.ActiveSignature {
+		t.Errorf("JSON roundtrip failed: got activeSignature=%v, want %v",
+			unmarshaled.ActiveSignature, result.ActiveSignature)
+	}
+	if unmarshaled.ActiveParameter != result.ActiveParameter {
+		t.Errorf("JSON roundtrip failed: got activeParameter=%v, want %v",
+			unmarshaled.ActiveParameter, result.ActiveParameter)
+	}
+}
+
+func TestTypeHierarchyItemResult(t *testing.T) {
+	result := TypeHierarchyItemResult{
+		Name:   "TestInterface",
+		Kind:   11, // Interface
+		Detail: "interface TestInterface",
+		URI:    "file:///test.go",
+		Range: LocationResult{
+			URI:          "file:///test.go",
+			Line:         5,
+			Character:    0,
+			EndLine:      10,
+			EndCharacter: 1,
+		},
+		SelectionRange: LocationResult{
+			URI:          "file:///test.go",
+			Line:         5,
+			Character:    10,
+			EndLine:      5,
+			EndCharacter: 23,
+		},
+	}
+
+	// Test JSON marshaling
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Errorf("json.Marshal(TypeHierarchyItemResult) error = %v", err)
+	}
+
+	// Test JSON unmarshaling
+	var unmarshaled TypeHierarchyItemResult
+	err = json.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Errorf("json.Unmarshal(TypeHierarchyItemResult) error = %v", err)
+	}
+
+	if unmarshaled.Name != result.Name {
+		t.Errorf("JSON roundtrip failed: got name=%v, want %v", unmarshaled.Name, result.Name)
+	}
+	if unmarshaled.Kind != result.Kind {
+		t.Errorf("JSON roundtrip failed: got kind=%v, want %v", unmarshaled.Kind, result.Kind)
+	}
+	if unmarshaled.URI != result.URI {
+		t.Errorf("JSON roundtrip failed: got uri=%v, want %v", unmarshaled.URI, result.URI)
+	}
+}
+
+func TestGetTypeHierarchyResult(t *testing.T) {
+	result := GetTypeHierarchyResult{
+		Direction: "supertypes",
+		Supertypes: []TypeHierarchyItemResult{
+			{
+				Name: "ParentInterface",
+				Kind: 11, // Interface
+				URI:  "file:///parent.go",
+			},
+		},
+		Subtypes: []TypeHierarchyItemResult{
+			{
+				Name: "ChildStruct",
+				Kind: 23, // Struct
+				URI:  "file:///child.go",
+			},
+		},
+	}
+
+	// Test JSON marshaling
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Errorf("json.Marshal(GetTypeHierarchyResult) error = %v", err)
+	}
+
+	// Test JSON unmarshaling
+	var unmarshaled GetTypeHierarchyResult
+	err = json.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Errorf("json.Unmarshal(GetTypeHierarchyResult) error = %v", err)
+	}
+
+	if unmarshaled.Direction != result.Direction {
+		t.Errorf("JSON roundtrip failed: got direction=%v, want %v", unmarshaled.Direction, result.Direction)
+	}
+	if len(unmarshaled.Supertypes) != len(result.Supertypes) {
+		t.Errorf("JSON roundtrip failed: got %d supertypes, want %d", len(unmarshaled.Supertypes), len(result.Supertypes))
+	}
+	if len(unmarshaled.Subtypes) != len(result.Subtypes) {
+		t.Errorf("JSON roundtrip failed: got %d subtypes, want %d", len(unmarshaled.Subtypes), len(result.Subtypes))
+	}
+}
+
+// Tests for Phase 3 MCP tool handlers.
+func TestWorkspaceManagerPhase3ToolHandlersWhenNotRunning(t *testing.T) {
+	logger := newTestLogger()
+	workspaces := []string{"/test/workspace1", "/test/workspace2"}
+	workspaceManager := NewWorkspaceManager(workspaces, logger)
+	ctx := context.Background()
+
+	// Test HandleGetCallHierarchy when not running
+	callParams := &mcp.CallToolParamsFor[GetCallHierarchyParams]{
+		Arguments: GetCallHierarchyParams{
+			Workspace: "/test/workspace1",
+			URI:       "file:///test.go",
+			Line:      10,
+			Character: 5,
+			Direction: "incoming",
+		},
+	}
+	_, err := workspaceManager.HandleGetCallHierarchy(ctx, nil, callParams)
+	if err == nil {
+		t.Error("HandleGetCallHierarchy() on non-running workspace manager should return error")
+	}
+
+	// Test HandleGetSignatureHelp when not running
+	sigParams := &mcp.CallToolParamsFor[GetSignatureHelpParams]{
+		Arguments: GetSignatureHelpParams{
+			Workspace: "/test/workspace1",
+			URI:       "file:///test.go",
+			Line:      10,
+			Character: 5,
+		},
+	}
+	_, err = workspaceManager.HandleGetSignatureHelp(ctx, nil, sigParams)
+	if err == nil {
+		t.Error("HandleGetSignatureHelp() on non-running workspace manager should return error")
+	}
+
+	// Test HandleGetTypeHierarchy when not running
+	typeParams := &mcp.CallToolParamsFor[GetTypeHierarchyParams]{
+		Arguments: GetTypeHierarchyParams{
+			Workspace: "/test/workspace1",
+			URI:       "file:///test.go",
+			Line:      10,
+			Character: 5,
+			Direction: "supertypes",
+		},
+	}
+	_, err = workspaceManager.HandleGetTypeHierarchy(ctx, nil, typeParams)
+	if err == nil {
+		t.Error("HandleGetTypeHierarchy() on non-running workspace manager should return error")
+	}
+
+	// Test with nonexistent workspace
+	badCallParams := &mcp.CallToolParamsFor[GetCallHierarchyParams]{
+		Arguments: GetCallHierarchyParams{
+			Workspace: "/nonexistent/workspace",
+			URI:       "file:///test.go",
+			Line:      10,
+			Character: 5,
+			Direction: "incoming",
+		},
+	}
+	_, err = workspaceManager.HandleGetCallHierarchy(ctx, nil, badCallParams)
+	if err == nil {
+		t.Error("HandleGetCallHierarchy() with nonexistent workspace should return error")
+	}
+
+	badSigParams := &mcp.CallToolParamsFor[GetSignatureHelpParams]{
+		Arguments: GetSignatureHelpParams{
+			Workspace: "/nonexistent/workspace",
+			URI:       "file:///test.go",
+			Line:      10,
+			Character: 5,
+		},
+	}
+	_, err = workspaceManager.HandleGetSignatureHelp(ctx, nil, badSigParams)
+	if err == nil {
+		t.Error("HandleGetSignatureHelp() with nonexistent workspace should return error")
+	}
+
+	badTypeParams := &mcp.CallToolParamsFor[GetTypeHierarchyParams]{
+		Arguments: GetTypeHierarchyParams{
+			Workspace: "/nonexistent/workspace",
+			URI:       "file:///test.go",
+			Line:      10,
+			Character: 5,
+			Direction: "supertypes",
+		},
+	}
+	_, err = workspaceManager.HandleGetTypeHierarchy(ctx, nil, badTypeParams)
+	if err == nil {
+		t.Error("HandleGetTypeHierarchy() with nonexistent workspace should return error")
+	}
+}
+
+// Tests for Phase 3 tool creation.
+func TestWorkspaceManagerCreatePhase3Tools(t *testing.T) {
+	logger := newTestLogger()
+	workspaces := []string{"/test/workspace1", "/test/workspace2"}
+	workspaceManager := NewWorkspaceManager(workspaces, logger)
+
+	// Test CreateGetCallHierarchyTool
+	tool := workspaceManager.CreateGetCallHierarchyTool()
+	if tool == nil {
+		t.Error("CreateGetCallHierarchyTool() returned nil")
+	}
+
+	// Test CreateGetSignatureHelpTool
+	tool = workspaceManager.CreateGetSignatureHelpTool()
+	if tool == nil {
+		t.Error("CreateGetSignatureHelpTool() returned nil")
+	}
+
+	// Test CreateGetTypeHierarchyTool
+	tool = workspaceManager.CreateGetTypeHierarchyTool()
+	if tool == nil {
+		t.Error("CreateGetTypeHierarchyTool() returned nil")
+	}
+}

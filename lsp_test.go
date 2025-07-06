@@ -1149,3 +1149,426 @@ func TestParseCompletionsFromResponse(t *testing.T) {
 		})
 	}
 }
+
+func TestParseCallHierarchyItemFromMap(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    map[string]any
+		expected CallHierarchyItem
+	}{
+		{
+			name: "valid call hierarchy item",
+			input: map[string]any{
+				"name":   "TestFunction",
+				"kind":   float64(12), // Function
+				"detail": "func TestFunction()",
+				"uri":    "file:///test.go",
+				"range": map[string]any{
+					"start": map[string]any{
+						"line":      float64(10),
+						"character": float64(0),
+					},
+					"end": map[string]any{
+						"line":      float64(15),
+						"character": float64(1),
+					},
+				},
+				"selectionRange": map[string]any{
+					"start": map[string]any{
+						"line":      float64(10),
+						"character": float64(5),
+					},
+					"end": map[string]any{
+						"line":      float64(10),
+						"character": float64(17),
+					},
+				},
+			},
+			expected: CallHierarchyItem{
+				Name:   "TestFunction",
+				Kind:   SymbolKindFunction,
+				Detail: "func TestFunction()",
+				URI:    "file:///test.go",
+				Range: Range{
+					Start: Position{Line: 10, Character: 0},
+					End:   Position{Line: 15, Character: 1},
+				},
+				SelectionRange: Range{
+					Start: Position{Line: 10, Character: 5},
+					End:   Position{Line: 10, Character: 17},
+				},
+			},
+		},
+		{
+			name:  "empty call hierarchy item",
+			input: map[string]any{},
+			expected: CallHierarchyItem{
+				Name:           "",
+				Kind:           0,
+				Detail:         "",
+				URI:            "",
+				Range:          Range{},
+				SelectionRange: Range{},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := parseCallHierarchyItemFromMap(tt.input)
+			if !reflect.DeepEqual(result, tt.expected) {
+				t.Errorf("parseCallHierarchyItemFromMap() = %+v, want %+v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestParseCallHierarchyItemsFromResponse(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    map[string]any
+		expected []CallHierarchyItem
+		wantErr  bool
+	}{
+		{
+			name: "valid call hierarchy items response",
+			input: map[string]any{
+				"result": []any{
+					map[string]any{
+						"name": "TestFunction",
+						"kind": float64(12), // Function
+						"uri":  "file:///test.go",
+						"range": map[string]any{
+							"start": map[string]any{
+								"line":      float64(10),
+								"character": float64(0),
+							},
+							"end": map[string]any{
+								"line":      float64(15),
+								"character": float64(1),
+							},
+						},
+						"selectionRange": map[string]any{
+							"start": map[string]any{
+								"line":      float64(10),
+								"character": float64(5),
+							},
+							"end": map[string]any{
+								"line":      float64(10),
+								"character": float64(17),
+							},
+						},
+					},
+				},
+			},
+			expected: []CallHierarchyItem{
+				{
+					Name: "TestFunction",
+					Kind: SymbolKindFunction,
+					URI:  "file:///test.go",
+					Range: Range{
+						Start: Position{Line: 10, Character: 0},
+						End:   Position{Line: 15, Character: 1},
+					},
+					SelectionRange: Range{
+						Start: Position{Line: 10, Character: 5},
+						End:   Position{Line: 10, Character: 17},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "empty response",
+			input: map[string]any{
+				"result": []any{},
+			},
+			expected: nil,
+			wantErr:  false,
+		},
+		{
+			name:     "missing result",
+			input:    map[string]any{},
+			expected: nil,
+			wantErr:  true,
+		},
+		{
+			name: "invalid result type",
+			input: map[string]any{
+				"result": "not an array",
+			},
+			expected: nil,
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parseCallHierarchyItemsFromResponse(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseCallHierarchyItemsFromResponse() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(result, tt.expected) {
+				t.Errorf("parseCallHierarchyItemsFromResponse() = %+v, want %+v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestParseIncomingCallFromMap(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    map[string]any
+		expected CallHierarchyIncomingCall
+	}{
+		{
+			name: "valid incoming call",
+			input: map[string]any{
+				"from": map[string]any{
+					"name": "CallerFunction",
+					"kind": float64(12), // Function
+					"uri":  "file:///caller.go",
+					"range": map[string]any{
+						"start": map[string]any{
+							"line":      float64(5),
+							"character": float64(0),
+						},
+						"end": map[string]any{
+							"line":      float64(10),
+							"character": float64(1),
+						},
+					},
+					"selectionRange": map[string]any{
+						"start": map[string]any{
+							"line":      float64(5),
+							"character": float64(5),
+						},
+						"end": map[string]any{
+							"line":      float64(5),
+							"character": float64(19),
+						},
+					},
+				},
+				"fromRanges": []any{
+					map[string]any{
+						"start": map[string]any{
+							"line":      float64(7),
+							"character": float64(4),
+						},
+						"end": map[string]any{
+							"line":      float64(7),
+							"character": float64(16),
+						},
+					},
+				},
+			},
+			expected: CallHierarchyIncomingCall{
+				From: CallHierarchyItem{
+					Name: "CallerFunction",
+					Kind: SymbolKindFunction,
+					URI:  "file:///caller.go",
+					Range: Range{
+						Start: Position{Line: 5, Character: 0},
+						End:   Position{Line: 10, Character: 1},
+					},
+					SelectionRange: Range{
+						Start: Position{Line: 5, Character: 5},
+						End:   Position{Line: 5, Character: 19},
+					},
+				},
+				FromRanges: []Range{
+					{
+						Start: Position{Line: 7, Character: 4},
+						End:   Position{Line: 7, Character: 16},
+					},
+				},
+			},
+		},
+		{
+			name:  "empty incoming call",
+			input: map[string]any{},
+			expected: CallHierarchyIncomingCall{
+				From:       CallHierarchyItem{},
+				FromRanges: nil,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := parseIncomingCallFromMap(tt.input)
+			if !reflect.DeepEqual(result, tt.expected) {
+				t.Errorf("parseIncomingCallFromMap() = %+v, want %+v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestParseSignatureHelpFromResponse(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    map[string]any
+		expected *SignatureHelp
+		wantErr  bool
+	}{
+		{
+			name: "valid signature help response",
+			input: map[string]any{
+				"result": map[string]any{
+					"signatures": []any{
+						map[string]any{
+							"label":         "TestFunction(param1 string, param2 int) error",
+							"documentation": "TestFunction performs a test operation",
+							"parameters": []any{
+								map[string]any{
+									"label":         "param1 string",
+									"documentation": "First parameter",
+								},
+								map[string]any{
+									"label":         "param2 int",
+									"documentation": "Second parameter",
+								},
+							},
+						},
+					},
+					"activeSignature": float64(0),
+					"activeParameter": float64(1),
+				},
+			},
+			expected: &SignatureHelp{
+				Signatures: []SignatureInformation{
+					{
+						Label:         "TestFunction(param1 string, param2 int) error",
+						Documentation: "TestFunction performs a test operation",
+						Parameters: []ParameterInformation{
+							{
+								Label:         "param1 string",
+								Documentation: "First parameter",
+							},
+							{
+								Label:         "param2 int",
+								Documentation: "Second parameter",
+							},
+						},
+					},
+				},
+				ActiveSignature: 0,
+				ActiveParameter: 1,
+			},
+			wantErr: false,
+		},
+		{
+			name: "empty signature help response",
+			input: map[string]any{
+				"result": map[string]any{},
+			},
+			expected: &SignatureHelp{
+				Signatures:      nil,
+				ActiveSignature: 0,
+				ActiveParameter: 0,
+			},
+			wantErr: false,
+		},
+		{
+			name:     "missing result",
+			input:    map[string]any{},
+			expected: nil,
+			wantErr:  true,
+		},
+		{
+			name: "invalid result type",
+			input: map[string]any{
+				"result": "not a map",
+			},
+			expected: nil,
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parseSignatureHelpFromResponse(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseSignatureHelpFromResponse() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(result, tt.expected) {
+				t.Errorf("parseSignatureHelpFromResponse() = %+v, want %+v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestParseTypeHierarchyItemFromMap(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    map[string]any
+		expected TypeHierarchyItem
+	}{
+		{
+			name: "valid type hierarchy item",
+			input: map[string]any{
+				"name":   "TestInterface",
+				"kind":   float64(11), // Interface
+				"detail": "interface TestInterface",
+				"uri":    "file:///test.go",
+				"range": map[string]any{
+					"start": map[string]any{
+						"line":      float64(5),
+						"character": float64(0),
+					},
+					"end": map[string]any{
+						"line":      float64(10),
+						"character": float64(1),
+					},
+				},
+				"selectionRange": map[string]any{
+					"start": map[string]any{
+						"line":      float64(5),
+						"character": float64(10),
+					},
+					"end": map[string]any{
+						"line":      float64(5),
+						"character": float64(23),
+					},
+				},
+			},
+			expected: TypeHierarchyItem{
+				Name:   "TestInterface",
+				Kind:   SymbolKindInterface,
+				Detail: "interface TestInterface",
+				URI:    "file:///test.go",
+				Range: Range{
+					Start: Position{Line: 5, Character: 0},
+					End:   Position{Line: 10, Character: 1},
+				},
+				SelectionRange: Range{
+					Start: Position{Line: 5, Character: 10},
+					End:   Position{Line: 5, Character: 23},
+				},
+			},
+		},
+		{
+			name:  "empty type hierarchy item",
+			input: map[string]any{},
+			expected: TypeHierarchyItem{
+				Name:           "",
+				Kind:           0,
+				Detail:         "",
+				URI:            "",
+				Range:          Range{},
+				SelectionRange: Range{},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := parseTypeHierarchyItemFromMap(tt.input)
+			if !reflect.DeepEqual(result, tt.expected) {
+				t.Errorf("parseTypeHierarchyItemFromMap() = %+v, want %+v", result, tt.expected)
+			}
+		})
+	}
+}
