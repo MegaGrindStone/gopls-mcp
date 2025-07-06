@@ -477,3 +477,411 @@ func TestGetHoverResult(t *testing.T) {
 		t.Errorf("JSON roundtrip failed: got HasRange=%v, want %v", unmarshaled.HasRange, result.HasRange)
 	}
 }
+
+func TestGetDocumentSymbolsParams(t *testing.T) {
+	params := GetDocumentSymbolsParams{
+		Workspace: "/test/workspace",
+		URI:       "file:///test.go",
+	}
+
+	// Test JSON marshaling
+	data, err := json.Marshal(params)
+	if err != nil {
+		t.Errorf("json.Marshal(GetDocumentSymbolsParams) error = %v", err)
+	}
+
+	// Test JSON unmarshaling
+	var unmarshaled GetDocumentSymbolsParams
+	err = json.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Errorf("json.Unmarshal(GetDocumentSymbolsParams) error = %v", err)
+	}
+
+	if unmarshaled != params {
+		t.Errorf("JSON roundtrip failed: got %v, want %v", unmarshaled, params)
+	}
+}
+
+func TestSearchWorkspaceSymbolsParams(t *testing.T) {
+	params := SearchWorkspaceSymbolsParams{
+		Workspace: "/test/workspace",
+		Query:     "TestFunction",
+	}
+
+	// Test JSON marshaling
+	data, err := json.Marshal(params)
+	if err != nil {
+		t.Errorf("json.Marshal(SearchWorkspaceSymbolsParams) error = %v", err)
+	}
+
+	// Test JSON unmarshaling
+	var unmarshaled SearchWorkspaceSymbolsParams
+	err = json.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Errorf("json.Unmarshal(SearchWorkspaceSymbolsParams) error = %v", err)
+	}
+
+	if unmarshaled != params {
+		t.Errorf("JSON roundtrip failed: got %v, want %v", unmarshaled, params)
+	}
+}
+
+func TestGoToTypeDefinitionParams(t *testing.T) {
+	params := GoToTypeDefinitionParams{
+		Workspace: "/test/workspace",
+		URI:       "file:///test.go",
+		Line:      10,
+		Character: 5,
+	}
+
+	// Test JSON marshaling
+	data, err := json.Marshal(params)
+	if err != nil {
+		t.Errorf("json.Marshal(GoToTypeDefinitionParams) error = %v", err)
+	}
+
+	// Test JSON unmarshaling
+	var unmarshaled GoToTypeDefinitionParams
+	err = json.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Errorf("json.Unmarshal(GoToTypeDefinitionParams) error = %v", err)
+	}
+
+	if unmarshaled != params {
+		t.Errorf("JSON roundtrip failed: got %v, want %v", unmarshaled, params)
+	}
+}
+
+func TestDocumentSymbolResult(t *testing.T) {
+	result := DocumentSymbolResult{
+		Name:       "TestFunction",
+		Detail:     "func TestFunction()",
+		Kind:       12, // Function
+		Deprecated: false,
+		Range: LocationResult{
+			URI:          "file:///test.go",
+			Line:         10,
+			Character:    0,
+			EndLine:      15,
+			EndCharacter: 1,
+		},
+		SelectionRange: LocationResult{
+			URI:          "file:///test.go",
+			Line:         10,
+			Character:    5,
+			EndLine:      10,
+			EndCharacter: 17,
+		},
+		Children: []DocumentSymbolResult{
+			{
+				Name: "LocalVar",
+				Kind: 13, // Variable
+				Range: LocationResult{
+					URI:          "file:///test.go",
+					Line:         11,
+					Character:    4,
+					EndLine:      11,
+					EndCharacter: 12,
+				},
+				SelectionRange: LocationResult{
+					URI:          "file:///test.go",
+					Line:         11,
+					Character:    4,
+					EndLine:      11,
+					EndCharacter: 12,
+				},
+			},
+		},
+	}
+
+	// Test JSON marshaling
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Errorf("json.Marshal(DocumentSymbolResult) error = %v", err)
+	}
+
+	// Test JSON unmarshaling
+	var unmarshaled DocumentSymbolResult
+	err = json.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Errorf("json.Unmarshal(DocumentSymbolResult) error = %v", err)
+	}
+
+	if len(unmarshaled.Children) != len(result.Children) {
+		t.Errorf("JSON roundtrip failed: got %d children, want %d", len(unmarshaled.Children), len(result.Children))
+	}
+}
+
+func TestGetDocumentSymbolsResult(t *testing.T) {
+	result := GetDocumentSymbolsResult{
+		Symbols: []DocumentSymbolResult{
+			{
+				Name: "TestFunction",
+				Kind: 12, // Function
+				Range: LocationResult{
+					URI:          "file:///test.go",
+					Line:         10,
+					Character:    0,
+					EndLine:      15,
+					EndCharacter: 1,
+				},
+				SelectionRange: LocationResult{
+					URI:          "file:///test.go",
+					Line:         10,
+					Character:    5,
+					EndLine:      10,
+					EndCharacter: 17,
+				},
+			},
+		},
+	}
+
+	// Test JSON marshaling
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Errorf("json.Marshal(GetDocumentSymbolsResult) error = %v", err)
+	}
+
+	// Test JSON unmarshaling
+	var unmarshaled GetDocumentSymbolsResult
+	err = json.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Errorf("json.Unmarshal(GetDocumentSymbolsResult) error = %v", err)
+	}
+
+	if len(unmarshaled.Symbols) != len(result.Symbols) {
+		t.Errorf("JSON roundtrip failed: got %d symbols, want %d", len(unmarshaled.Symbols), len(result.Symbols))
+	}
+}
+
+func TestWorkspaceSymbolResult(t *testing.T) {
+	result := WorkspaceSymbolResult{
+		Name:       "TestStruct",
+		Kind:       23, // Struct
+		Deprecated: false,
+		Location: LocationResult{
+			URI:          "file:///test.go",
+			Line:         5,
+			Character:    0,
+			EndLine:      10,
+			EndCharacter: 1,
+		},
+		ContainerName: "main",
+	}
+
+	// Test JSON marshaling
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Errorf("json.Marshal(WorkspaceSymbolResult) error = %v", err)
+	}
+
+	// Test JSON unmarshaling
+	var unmarshaled WorkspaceSymbolResult
+	err = json.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Errorf("json.Unmarshal(WorkspaceSymbolResult) error = %v", err)
+	}
+
+	if unmarshaled.Name != result.Name {
+		t.Errorf("JSON roundtrip failed: got name=%v, want %v", unmarshaled.Name, result.Name)
+	}
+	if unmarshaled.ContainerName != result.ContainerName {
+		t.Errorf("JSON roundtrip failed: got containerName=%v, want %v", unmarshaled.ContainerName, result.ContainerName)
+	}
+}
+
+func TestSearchWorkspaceSymbolsResult(t *testing.T) {
+	result := SearchWorkspaceSymbolsResult{
+		Symbols: []WorkspaceSymbolResult{
+			{
+				Name: "TestStruct",
+				Kind: 23, // Struct
+				Location: LocationResult{
+					URI:          "file:///test.go",
+					Line:         5,
+					Character:    0,
+					EndLine:      10,
+					EndCharacter: 1,
+				},
+				ContainerName: "main",
+			},
+		},
+	}
+
+	// Test JSON marshaling
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Errorf("json.Marshal(SearchWorkspaceSymbolsResult) error = %v", err)
+	}
+
+	// Test JSON unmarshaling
+	var unmarshaled SearchWorkspaceSymbolsResult
+	err = json.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Errorf("json.Unmarshal(SearchWorkspaceSymbolsResult) error = %v", err)
+	}
+
+	if len(unmarshaled.Symbols) != len(result.Symbols) {
+		t.Errorf("JSON roundtrip failed: got %d symbols, want %d", len(unmarshaled.Symbols), len(result.Symbols))
+	}
+}
+
+func TestGoToTypeDefinitionResult(t *testing.T) {
+	result := GoToTypeDefinitionResult{
+		Locations: []LocationResult{
+			{
+				URI:          "file:///test.go",
+				Line:         10,
+				Character:    5,
+				EndLine:      10,
+				EndCharacter: 15,
+			},
+		},
+	}
+
+	// Test JSON marshaling
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Errorf("json.Marshal(GoToTypeDefinitionResult) error = %v", err)
+	}
+
+	// Test JSON unmarshaling
+	var unmarshaled GoToTypeDefinitionResult
+	err = json.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Errorf("json.Unmarshal(GoToTypeDefinitionResult) error = %v", err)
+	}
+
+	if len(unmarshaled.Locations) != len(result.Locations) {
+		t.Errorf("JSON roundtrip failed: got %d locations, want %d", len(unmarshaled.Locations), len(result.Locations))
+	}
+}
+
+func TestWorkspaceManagerMCPNewToolHandlersWhenNotRunning(t *testing.T) {
+	logger := newTestLogger()
+	workspaces := []string{"/test/workspace1", "/test/workspace2"}
+	workspaceManager := NewWorkspaceManager(workspaces, logger)
+	ctx := context.Background()
+
+	// Test HandleGetDocumentSymbols when not running
+	docParams := &mcp.CallToolParamsFor[GetDocumentSymbolsParams]{
+		Arguments: GetDocumentSymbolsParams{
+			Workspace: "/test/workspace1",
+			URI:       "file:///test.go",
+		},
+	}
+	_, err := workspaceManager.HandleGetDocumentSymbols(ctx, nil, docParams)
+	if err == nil {
+		t.Error("HandleGetDocumentSymbols() on non-running workspace manager should return error")
+	}
+
+	// Test HandleSearchWorkspaceSymbols when not running
+	searchParams := &mcp.CallToolParamsFor[SearchWorkspaceSymbolsParams]{
+		Arguments: SearchWorkspaceSymbolsParams{
+			Workspace: "/test/workspace1",
+			Query:     "TestFunction",
+		},
+	}
+	_, err = workspaceManager.HandleSearchWorkspaceSymbols(ctx, nil, searchParams)
+	if err == nil {
+		t.Error("HandleSearchWorkspaceSymbols() on non-running workspace manager should return error")
+	}
+
+	// Test HandleGoToTypeDefinition when not running
+	typeParams := &mcp.CallToolParamsFor[GoToTypeDefinitionParams]{
+		Arguments: GoToTypeDefinitionParams{
+			Workspace: "/test/workspace1",
+			URI:       "file:///test.go",
+			Line:      10,
+			Character: 5,
+		},
+	}
+	_, err = workspaceManager.HandleGoToTypeDefinition(ctx, nil, typeParams)
+	if err == nil {
+		t.Error("HandleGoToTypeDefinition() on non-running workspace manager should return error")
+	}
+
+	// Test with nonexistent workspace
+	badDocParams := &mcp.CallToolParamsFor[GetDocumentSymbolsParams]{
+		Arguments: GetDocumentSymbolsParams{
+			Workspace: "/nonexistent/workspace",
+			URI:       "file:///test.go",
+		},
+	}
+	_, err = workspaceManager.HandleGetDocumentSymbols(ctx, nil, badDocParams)
+	if err == nil {
+		t.Error("HandleGetDocumentSymbols() with nonexistent workspace should return error")
+	}
+
+	badSearchParams := &mcp.CallToolParamsFor[SearchWorkspaceSymbolsParams]{
+		Arguments: SearchWorkspaceSymbolsParams{
+			Workspace: "/nonexistent/workspace",
+			Query:     "TestFunction",
+		},
+	}
+	_, err = workspaceManager.HandleSearchWorkspaceSymbols(ctx, nil, badSearchParams)
+	if err == nil {
+		t.Error("HandleSearchWorkspaceSymbols() with nonexistent workspace should return error")
+	}
+
+	badTypeParams := &mcp.CallToolParamsFor[GoToTypeDefinitionParams]{
+		Arguments: GoToTypeDefinitionParams{
+			Workspace: "/nonexistent/workspace",
+			URI:       "file:///test.go",
+			Line:      10,
+			Character: 5,
+		},
+	}
+	_, err = workspaceManager.HandleGoToTypeDefinition(ctx, nil, badTypeParams)
+	if err == nil {
+		t.Error("HandleGoToTypeDefinition() with nonexistent workspace should return error")
+	}
+}
+
+func TestWorkspaceManagerCreateNewTools(t *testing.T) {
+	logger := newTestLogger()
+	workspaces := []string{"/test/workspace1", "/test/workspace2"}
+	workspaceManager := NewWorkspaceManager(workspaces, logger)
+
+	// Test CreateGetDocumentSymbolsTool
+	tool := workspaceManager.CreateGetDocumentSymbolsTool()
+	if tool == nil {
+		t.Error("CreateGetDocumentSymbolsTool() returned nil")
+	}
+
+	// Test CreateSearchWorkspaceSymbolsTool
+	tool = workspaceManager.CreateSearchWorkspaceSymbolsTool()
+	if tool == nil {
+		t.Error("CreateSearchWorkspaceSymbolsTool() returned nil")
+	}
+
+	// Test CreateGoToTypeDefinitionTool
+	tool = workspaceManager.CreateGoToTypeDefinitionTool()
+	if tool == nil {
+		t.Error("CreateGoToTypeDefinitionTool() returned nil")
+	}
+}
+
+func TestManagerNewLSPMethodsWhenNotRunning(t *testing.T) {
+	logger := newTestLogger()
+	manager := NewManager("/test/workspace", logger)
+	ctx := context.Background()
+
+	// Test GetDocumentSymbols when not running
+	_, err := manager.GetDocumentSymbols(ctx, "file:///test.go")
+	if err == nil {
+		t.Error("GetDocumentSymbols() on non-running manager should return error")
+	}
+
+	// Test SearchWorkspaceSymbols when not running
+	_, err = manager.SearchWorkspaceSymbols(ctx, "TestFunction")
+	if err == nil {
+		t.Error("SearchWorkspaceSymbols() on non-running manager should return error")
+	}
+
+	// Test GoToTypeDefinition when not running
+	_, err = manager.GoToTypeDefinition(ctx, "file:///test.go", 10, 5)
+	if err == nil {
+		t.Error("GoToTypeDefinition() on non-running manager should return error")
+	}
+}

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
 )
 
 // Position represents a position in a document.
@@ -49,6 +50,66 @@ type ReferenceContext struct {
 type Hover struct {
 	Contents []string `json:"contents"`
 	Range    *Range   `json:"range,omitempty"`
+}
+
+// SymbolKind represents the kind of a symbol.
+type SymbolKind int
+
+// SymbolKind constants represent the kinds of symbols as defined in the LSP specification.
+const (
+	SymbolKindFile          SymbolKind = 1
+	SymbolKindModule        SymbolKind = 2
+	SymbolKindNamespace     SymbolKind = 3
+	SymbolKindPackage       SymbolKind = 4
+	SymbolKindClass         SymbolKind = 5
+	SymbolKindMethod        SymbolKind = 6
+	SymbolKindProperty      SymbolKind = 7
+	SymbolKindField         SymbolKind = 8
+	SymbolKindConstructor   SymbolKind = 9
+	SymbolKindEnum          SymbolKind = 10
+	SymbolKindInterface     SymbolKind = 11
+	SymbolKindFunction      SymbolKind = 12
+	SymbolKindVariable      SymbolKind = 13
+	SymbolKindConstant      SymbolKind = 14
+	SymbolKindString        SymbolKind = 15
+	SymbolKindNumber        SymbolKind = 16
+	SymbolKindBoolean       SymbolKind = 17
+	SymbolKindArray         SymbolKind = 18
+	SymbolKindObject        SymbolKind = 19
+	SymbolKindKey           SymbolKind = 20
+	SymbolKindNull          SymbolKind = 21
+	SymbolKindEnumMember    SymbolKind = 22
+	SymbolKindStruct        SymbolKind = 23
+	SymbolKindEvent         SymbolKind = 24
+	SymbolKindOperator      SymbolKind = 25
+	SymbolKindTypeParameter SymbolKind = 26
+)
+
+// DocumentSymbol represents a symbol within a document.
+type DocumentSymbol struct {
+	Name           string           `json:"name"`
+	Detail         string           `json:"detail,omitempty"`
+	Kind           SymbolKind       `json:"kind"`
+	Tags           []int            `json:"tags,omitempty"`
+	Deprecated     bool             `json:"deprecated,omitempty"`
+	Range          Range            `json:"range"`
+	SelectionRange Range            `json:"selectionRange"`
+	Children       []DocumentSymbol `json:"children,omitempty"`
+}
+
+// SymbolInformation represents information about a symbol.
+type SymbolInformation struct {
+	Name          string     `json:"name"`
+	Kind          SymbolKind `json:"kind"`
+	Tags          []int      `json:"tags,omitempty"`
+	Deprecated    bool       `json:"deprecated,omitempty"`
+	Location      Location   `json:"location"`
+	ContainerName string     `json:"containerName,omitempty"`
+}
+
+// WorkspaceSymbolParams represents parameters for workspace symbol requests.
+type WorkspaceSymbolParams struct {
+	Query string `json:"query"`
 }
 
 // GoToDefinition sends a textDocument/definition request to gopls.
@@ -170,6 +231,103 @@ func (m *Manager) GetHover(_ context.Context, uri string, line, character int) (
 	return parseHoverFromResponse(response)
 }
 
+// GetDocumentSymbols sends a textDocument/documentSymbol request to gopls.
+func (m *Manager) GetDocumentSymbols(_ context.Context, uri string) ([]DocumentSymbol, error) {
+	m.logger.Debug("GetDocumentSymbols called", "uri", uri)
+
+	if !m.IsRunning() {
+		return nil, fmt.Errorf("gopls is not running")
+	}
+
+	// Ensure file is open in gopls
+	if err := m.ensureFileOpen(uri); err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
+	}
+
+	request := map[string]any{
+		"jsonrpc": "2.0",
+		"id":      m.nextRequestID(),
+		"method":  "textDocument/documentSymbol",
+		"params": map[string]any{
+			"textDocument": TextDocumentIdentifier{URI: uri},
+		},
+	}
+
+	response, err := m.sendRequestAndWait(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get document symbols: %w", err)
+	}
+
+	// Extract document symbols from response
+	return parseDocumentSymbolsFromResponse(response)
+}
+
+// SearchWorkspaceSymbols sends a workspace/symbol request to gopls.
+func (m *Manager) SearchWorkspaceSymbols(_ context.Context, query string) ([]SymbolInformation, error) {
+	m.logger.Debug("SearchWorkspaceSymbols called", "query", query)
+
+	if !m.IsRunning() {
+		return nil, fmt.Errorf("gopls is not running")
+	}
+
+	// Wait for workspace to be ready before making requests
+	if err := m.waitForWorkspaceReady(30 * time.Second); err != nil {
+		return nil, fmt.Errorf("workspace not ready: %w", err)
+	}
+
+	request := map[string]any{
+		"jsonrpc": "2.0",
+		"id":      m.nextRequestID(),
+		"method":  "workspace/symbol",
+		"params": WorkspaceSymbolParams{
+			Query: query,
+		},
+	}
+
+	response, err := m.sendRequestAndWait(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search workspace symbols: %w", err)
+	}
+
+	// Extract workspace symbols from response
+	return parseWorkspaceSymbolsFromResponse(response)
+}
+
+// GoToTypeDefinition sends a textDocument/typeDefinition request to gopls.
+func (m *Manager) GoToTypeDefinition(_ context.Context, uri string, line, character int) ([]Location, error) {
+	m.logger.Debug("GoToTypeDefinition called", "uri", uri, "line", line, "character", character)
+
+	if !m.IsRunning() {
+		return nil, fmt.Errorf("gopls is not running")
+	}
+
+	// Ensure file is open in gopls
+	if err := m.ensureFileOpen(uri); err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
+	}
+
+	request := map[string]any{
+		"jsonrpc": "2.0",
+		"id":      m.nextRequestID(),
+		"method":  "textDocument/typeDefinition",
+		"params": TextDocumentPositionParams{
+			TextDocument: TextDocumentIdentifier{URI: uri},
+			Position: Position{
+				Line:      line,
+				Character: character,
+			},
+		},
+	}
+
+	response, err := m.sendRequestAndWait(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get type definition: %w", err)
+	}
+
+	// Extract locations from response (reuse existing parser)
+	return parseLocationsFromResponse(response)
+}
+
 // parseRange parses a range from a map.
 func parseRange(rangeMap map[string]any) Range {
 	var rng Range
@@ -260,4 +418,104 @@ func parseHoverFromResponse(response map[string]any) (*Hover, error) {
 		hover.Range = &rng
 	}
 	return &hover, nil
+}
+
+// parseDocumentSymbolFromMap parses a single document symbol from a map.
+func parseDocumentSymbolFromMap(symbolMap map[string]any) DocumentSymbol {
+	var symbol DocumentSymbol
+
+	if name, nameOk := symbolMap["name"].(string); nameOk {
+		symbol.Name = name
+	}
+	if detail, detailOk := symbolMap["detail"].(string); detailOk {
+		symbol.Detail = detail
+	}
+	if kind, kindOk := symbolMap["kind"].(float64); kindOk {
+		symbol.Kind = SymbolKind(int(kind))
+	}
+	if deprecated, deprecatedOk := symbolMap["deprecated"].(bool); deprecatedOk {
+		symbol.Deprecated = deprecated
+	}
+	if rangeMap, rangeMapOk := symbolMap["range"].(map[string]any); rangeMapOk {
+		symbol.Range = parseRange(rangeMap)
+	}
+	if selectionRangeMap, selectionRangeMapOk := symbolMap["selectionRange"].(map[string]any); selectionRangeMapOk {
+		symbol.SelectionRange = parseRange(selectionRangeMap)
+	}
+	if children, childrenOk := symbolMap["children"].([]any); childrenOk {
+		for _, child := range children {
+			if childMap, childMapOk := child.(map[string]any); childMapOk {
+				symbol.Children = append(symbol.Children, parseDocumentSymbolFromMap(childMap))
+			}
+		}
+	}
+
+	return symbol
+}
+
+// parseDocumentSymbolsFromResponse extracts document symbols from LSP response.
+func parseDocumentSymbolsFromResponse(response map[string]any) ([]DocumentSymbol, error) {
+	result, resultOk := response["result"]
+	if !resultOk {
+		return nil, fmt.Errorf("invalid response format")
+	}
+
+	symbols, symbolsOk := result.([]any)
+	if !symbolsOk {
+		return nil, fmt.Errorf("invalid response format")
+	}
+
+	var documentSymbols []DocumentSymbol
+	for _, symbol := range symbols {
+		if symbolMap, symbolMapOk := symbol.(map[string]any); symbolMapOk {
+			documentSymbol := parseDocumentSymbolFromMap(symbolMap)
+			documentSymbols = append(documentSymbols, documentSymbol)
+		}
+	}
+	return documentSymbols, nil
+}
+
+// parseSymbolInformationFromMap parses a single symbol information from a map.
+func parseSymbolInformationFromMap(symbolMap map[string]any) SymbolInformation {
+	var symbol SymbolInformation
+
+	if name, nameOk := symbolMap["name"].(string); nameOk {
+		symbol.Name = name
+	}
+	if kind, kindOk := symbolMap["kind"].(float64); kindOk {
+		symbol.Kind = SymbolKind(int(kind))
+	}
+	if deprecated, deprecatedOk := symbolMap["deprecated"].(bool); deprecatedOk {
+		symbol.Deprecated = deprecated
+	}
+	if location, locationOk := symbolMap["location"].(map[string]any); locationOk {
+		symbol.Location = parseLocationFromMap(location)
+	}
+	if containerName, containerNameOk := symbolMap["containerName"].(string); containerNameOk {
+		symbol.ContainerName = containerName
+	}
+
+	return symbol
+}
+
+// parseWorkspaceSymbolsFromResponse extracts workspace symbols from LSP response.
+func parseWorkspaceSymbolsFromResponse(response map[string]any) ([]SymbolInformation, error) {
+	result, resultOk := response["result"]
+	if !resultOk {
+		return nil, fmt.Errorf("invalid response format")
+	}
+
+	symbols, symbolsOk := result.([]any)
+	if !symbolsOk {
+		return nil, fmt.Errorf("invalid response format")
+	}
+
+	var workspaceSymbols []SymbolInformation
+	for _, symbol := range symbols {
+		if symbolMap, symbolMapOk := symbol.(map[string]any); symbolMapOk {
+			symbolInfo := parseSymbolInformationFromMap(symbolMap)
+			workspaceSymbols = append(workspaceSymbols, symbolInfo)
+		}
+	}
+	return workspaceSymbols, nil
 }

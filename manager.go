@@ -740,6 +740,26 @@ type ListWorkspacesParams struct {
 	// No parameters needed for this tool
 }
 
+// GetDocumentSymbolsParams represents parameters for get document symbols requests.
+type GetDocumentSymbolsParams struct {
+	Workspace string `json:"workspace"`
+	URI       string `json:"uri"`
+}
+
+// SearchWorkspaceSymbolsParams represents parameters for search workspace symbols requests.
+type SearchWorkspaceSymbolsParams struct {
+	Workspace string `json:"workspace"`
+	Query     string `json:"query"`
+}
+
+// GoToTypeDefinitionParams represents parameters for go to type definition requests.
+type GoToTypeDefinitionParams struct {
+	Workspace string `json:"workspace"`
+	URI       string `json:"uri"`
+	Line      int    `json:"line"`
+	Character int    `json:"character"`
+}
+
 // LocationResult represents a location result.
 type LocationResult struct {
 	URI          string `json:"uri"`
@@ -777,9 +797,48 @@ type ListWorkspacesResult struct {
 	Workspaces []WorkspaceInfo `json:"workspaces"`
 }
 
+// DocumentSymbolResult represents a document symbol for MCP response.
+type DocumentSymbolResult struct {
+	Name           string                 `json:"name"`
+	Detail         string                 `json:"detail,omitempty"`
+	Kind           int                    `json:"kind"`
+	Tags           []int                  `json:"tags,omitempty"`
+	Deprecated     bool                   `json:"deprecated,omitempty"`
+	Range          LocationResult         `json:"range"`
+	SelectionRange LocationResult         `json:"selectionRange"`
+	Children       []DocumentSymbolResult `json:"children,omitempty"`
+}
+
+// GetDocumentSymbolsResult represents the result of a get document symbols request.
+type GetDocumentSymbolsResult struct {
+	Symbols []DocumentSymbolResult `json:"symbols"`
+}
+
+// WorkspaceSymbolResult represents a workspace symbol for MCP response.
+type WorkspaceSymbolResult struct {
+	Name          string         `json:"name"`
+	Kind          int            `json:"kind"`
+	Tags          []int          `json:"tags,omitempty"`
+	Deprecated    bool           `json:"deprecated,omitempty"`
+	Location      LocationResult `json:"location"`
+	ContainerName string         `json:"containerName,omitempty"`
+}
+
+// SearchWorkspaceSymbolsResult represents the result of a search workspace symbols request.
+type SearchWorkspaceSymbolsResult struct {
+	Symbols []WorkspaceSymbolResult `json:"symbols"`
+}
+
+// GoToTypeDefinitionResult represents the result of a go to type definition request.
+type GoToTypeDefinitionResult struct {
+	Locations []LocationResult `json:"locations"`
+}
+
 // MCP tool handlers
 
 // HandleGoToDefinition handles go to definition requests for WorkspaceManager.
+//
+//nolint:dupl // MCP handlers follow same pattern but have different types and method calls
 func (wm *WorkspaceManager) HandleGoToDefinition(
 	ctx context.Context,
 	_ *mcp.ServerSession,
@@ -966,6 +1025,209 @@ func (wm *WorkspaceManager) HandleListWorkspaces(
 	}, nil
 }
 
+// HandleGetDocumentSymbols handles get document symbols requests for WorkspaceManager.
+//
+//nolint:dupl // MCP handlers follow same pattern but have different types and method calls
+func (wm *WorkspaceManager) HandleGetDocumentSymbols(
+	ctx context.Context,
+	_ *mcp.ServerSession,
+	params *mcp.CallToolParamsFor[GetDocumentSymbolsParams],
+) (*mcp.CallToolResultFor[GetDocumentSymbolsResult], error) {
+	// Get the appropriate manager for the workspace
+	manager, err := wm.GetManager(params.Arguments.Workspace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get manager for workspace: %w", err)
+	}
+
+	if !manager.IsRunning() {
+		return nil, fmt.Errorf("gopls is not running for workspace: %s", params.Arguments.Workspace)
+	}
+
+	symbols, err := manager.GetDocumentSymbols(ctx, params.Arguments.URI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get document symbols: %w", err)
+	}
+
+	result := GetDocumentSymbolsResult{
+		Symbols: convertDocumentSymbolsToMCP(symbols),
+	}
+
+	jsonData, err := json.Marshal(result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal result: %w", err)
+	}
+
+	return &mcp.CallToolResultFor[GetDocumentSymbolsResult]{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: string(jsonData),
+			},
+		},
+	}, nil
+}
+
+// HandleSearchWorkspaceSymbols handles search workspace symbols requests for WorkspaceManager.
+//
+//nolint:dupl // MCP handlers follow same pattern but have different types and method calls
+func (wm *WorkspaceManager) HandleSearchWorkspaceSymbols(
+	ctx context.Context,
+	_ *mcp.ServerSession,
+	params *mcp.CallToolParamsFor[SearchWorkspaceSymbolsParams],
+) (*mcp.CallToolResultFor[SearchWorkspaceSymbolsResult], error) {
+	// Get the appropriate manager for the workspace
+	manager, err := wm.GetManager(params.Arguments.Workspace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get manager for workspace: %w", err)
+	}
+
+	if !manager.IsRunning() {
+		return nil, fmt.Errorf("gopls is not running for workspace: %s", params.Arguments.Workspace)
+	}
+
+	symbols, err := manager.SearchWorkspaceSymbols(ctx, params.Arguments.Query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search workspace symbols: %w", err)
+	}
+
+	result := SearchWorkspaceSymbolsResult{
+		Symbols: convertWorkspaceSymbolsToMCP(symbols),
+	}
+
+	jsonData, err := json.Marshal(result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal result: %w", err)
+	}
+
+	return &mcp.CallToolResultFor[SearchWorkspaceSymbolsResult]{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: string(jsonData),
+			},
+		},
+	}, nil
+}
+
+// HandleGoToTypeDefinition handles go to type definition requests for WorkspaceManager.
+//
+//nolint:dupl // MCP handlers follow same pattern but have different types and method calls
+func (wm *WorkspaceManager) HandleGoToTypeDefinition(
+	ctx context.Context,
+	_ *mcp.ServerSession,
+	params *mcp.CallToolParamsFor[GoToTypeDefinitionParams],
+) (*mcp.CallToolResultFor[GoToTypeDefinitionResult], error) {
+	// Get the appropriate manager for the workspace
+	manager, err := wm.GetManager(params.Arguments.Workspace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get manager for workspace: %w", err)
+	}
+
+	if !manager.IsRunning() {
+		return nil, fmt.Errorf("gopls is not running for workspace: %s", params.Arguments.Workspace)
+	}
+
+	locations, err := manager.GoToTypeDefinition(
+		ctx, params.Arguments.URI, params.Arguments.Line, params.Arguments.Character)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get type definition: %w", err)
+	}
+
+	result := GoToTypeDefinitionResult{
+		Locations: make([]LocationResult, len(locations)),
+	}
+
+	for i, loc := range locations {
+		result.Locations[i] = LocationResult{
+			URI:          loc.URI,
+			Line:         loc.Range.Start.Line,
+			Character:    loc.Range.Start.Character,
+			EndLine:      loc.Range.End.Line,
+			EndCharacter: loc.Range.End.Character,
+		}
+	}
+
+	jsonData, err := json.Marshal(result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal result: %w", err)
+	}
+
+	return &mcp.CallToolResultFor[GoToTypeDefinitionResult]{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: string(jsonData),
+			},
+		},
+	}, nil
+}
+
+// Helper functions to convert LSP types to MCP result types
+
+// convertDocumentSymbolToMCP converts a DocumentSymbol to DocumentSymbolResult.
+func convertDocumentSymbolToMCP(symbol DocumentSymbol) DocumentSymbolResult {
+	result := DocumentSymbolResult{
+		Name:       symbol.Name,
+		Detail:     symbol.Detail,
+		Kind:       int(symbol.Kind),
+		Tags:       symbol.Tags,
+		Deprecated: symbol.Deprecated,
+		Range: LocationResult{
+			URI:          "", // URI will be set by caller if needed
+			Line:         symbol.Range.Start.Line,
+			Character:    symbol.Range.Start.Character,
+			EndLine:      symbol.Range.End.Line,
+			EndCharacter: symbol.Range.End.Character,
+		},
+		SelectionRange: LocationResult{
+			URI:          "", // URI will be set by caller if needed
+			Line:         symbol.SelectionRange.Start.Line,
+			Character:    symbol.SelectionRange.Start.Character,
+			EndLine:      symbol.SelectionRange.End.Line,
+			EndCharacter: symbol.SelectionRange.End.Character,
+		},
+	}
+
+	for _, child := range symbol.Children {
+		result.Children = append(result.Children, convertDocumentSymbolToMCP(child))
+	}
+
+	return result
+}
+
+// convertDocumentSymbolsToMCP converts a slice of DocumentSymbol to DocumentSymbolResult.
+func convertDocumentSymbolsToMCP(symbols []DocumentSymbol) []DocumentSymbolResult {
+	var results []DocumentSymbolResult
+	for _, symbol := range symbols {
+		results = append(results, convertDocumentSymbolToMCP(symbol))
+	}
+	return results
+}
+
+// convertWorkspaceSymbolToMCP converts a SymbolInformation to WorkspaceSymbolResult.
+func convertWorkspaceSymbolToMCP(symbol SymbolInformation) WorkspaceSymbolResult {
+	return WorkspaceSymbolResult{
+		Name:       symbol.Name,
+		Kind:       int(symbol.Kind),
+		Tags:       symbol.Tags,
+		Deprecated: symbol.Deprecated,
+		Location: LocationResult{
+			URI:          symbol.Location.URI,
+			Line:         symbol.Location.Range.Start.Line,
+			Character:    symbol.Location.Range.Start.Character,
+			EndLine:      symbol.Location.Range.End.Line,
+			EndCharacter: symbol.Location.Range.End.Character,
+		},
+		ContainerName: symbol.ContainerName,
+	}
+}
+
+// convertWorkspaceSymbolsToMCP converts a slice of SymbolInformation to WorkspaceSymbolResult.
+func convertWorkspaceSymbolsToMCP(symbols []SymbolInformation) []WorkspaceSymbolResult {
+	var results []WorkspaceSymbolResult
+	for _, symbol := range symbols {
+		results = append(results, convertWorkspaceSymbolToMCP(symbol))
+	}
+	return results
+}
+
 // MCP tool creation methods for WorkspaceManager
 
 // CreateGoToDefinitionTool creates the go to definition MCP tool for WorkspaceManager.
@@ -1022,6 +1284,47 @@ func (wm *WorkspaceManager) CreateListWorkspacesTool() *mcp.ServerTool {
 		wm.HandleListWorkspaces,
 		mcp.Input(
 		// No input parameters needed
+		),
+	)
+}
+
+// CreateGetDocumentSymbolsTool creates the get document symbols MCP tool for WorkspaceManager.
+func (wm *WorkspaceManager) CreateGetDocumentSymbolsTool() *mcp.ServerTool {
+	return mcp.NewServerTool[GetDocumentSymbolsParams, GetDocumentSymbolsResult](
+		"get_document_symbols",
+		"Get all symbols (functions, types, variables, etc.) in a specific Go file",
+		wm.HandleGetDocumentSymbols,
+		mcp.Input(
+			mcp.Property("workspace", mcp.Description("Workspace path"), mcp.Required(true)),
+			mcp.Property("uri", mcp.Description("File URI (e.g., file:///path/to/file.go)"), mcp.Required(true)),
+		),
+	)
+}
+
+// CreateSearchWorkspaceSymbolsTool creates the search workspace symbols MCP tool for WorkspaceManager.
+func (wm *WorkspaceManager) CreateSearchWorkspaceSymbolsTool() *mcp.ServerTool {
+	return mcp.NewServerTool[SearchWorkspaceSymbolsParams, SearchWorkspaceSymbolsResult](
+		"search_workspace_symbols",
+		"Search for symbols across the entire Go workspace using fuzzy matching",
+		wm.HandleSearchWorkspaceSymbols,
+		mcp.Input(
+			mcp.Property("workspace", mcp.Description("Workspace path"), mcp.Required(true)),
+			mcp.Property("query", mcp.Description("Symbol search query (supports fuzzy matching)"), mcp.Required(true)),
+		),
+	)
+}
+
+// CreateGoToTypeDefinitionTool creates the go to type definition MCP tool for WorkspaceManager.
+func (wm *WorkspaceManager) CreateGoToTypeDefinitionTool() *mcp.ServerTool {
+	return mcp.NewServerTool[GoToTypeDefinitionParams, GoToTypeDefinitionResult](
+		"go_to_type_definition",
+		"Navigate to the type definition of a symbol at the specified position in a Go file",
+		wm.HandleGoToTypeDefinition,
+		mcp.Input(
+			mcp.Property("workspace", mcp.Description("Workspace path"), mcp.Required(true)),
+			mcp.Property("uri", mcp.Description("File URI (e.g., file:///path/to/file.go)"), mcp.Required(true)),
+			mcp.Property("line", mcp.Description("Line number (0-based)"), mcp.Required(true)),
+			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
 		),
 	)
 }
