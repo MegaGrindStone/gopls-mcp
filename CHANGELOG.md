@@ -12,9 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Multi-Workspace Support**: Complete multi-workspace architecture allowing multiple Go projects in a single server instance
 - **WorkspaceManager Component**: New component to coordinate multiple Manager instances with dedicated gopls processes per workspace
 - **New MCP Tool**: `list_workspaces` tool to display all available workspaces and their running status
+- **Phase 1 Core Navigation MCP Tools**: Three foundational navigation and discovery tools:
+  - `get_document_symbols`: Lists all symbols (functions, types, variables, etc.) in a specific Go file
+  - `search_workspace_symbols`: Searches for symbols across the entire Go workspace using fuzzy matching
+  - `go_to_type_definition`: Navigates to the type definition of a symbol at the specified position
+- **LSP Method Integration**: Added support for `textDocument/documentSymbol`, `workspace/symbol`, and `textDocument/typeDefinition` LSP methods
+- **Symbol Type Definitions**: Complete LSP symbol type system including `SymbolKind` constants, `DocumentSymbol`, and `SymbolInformation` types
+- **Enhanced MCP Response Types**: New structured response types for document symbols, workspace symbols, and type definitions
 - **Workspace Routing**: Intelligent request routing based on workspace parameter in MCP tool calls
 - **Enhanced Docker Support**: Multi-workspace Docker deployment with multiple volume mount examples
-- **Comprehensive Multi-Workspace Testing**: 47 tests covering single workspace, multiple workspaces, and workspace management scenarios
+- **Comprehensive Testing Coverage**: 47 tests covering single workspace, multiple workspaces, workspace management, and new navigation tools
 
 ### Changed
 
@@ -23,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `go_to_definition` requires `workspace` field
   - `find_references` requires `workspace` field  
   - `get_hover_info` requires `workspace` field
+  - `get_document_symbols` requires `workspace` field
+  - `search_workspace_symbols` requires `workspace` field
+  - `go_to_type_definition` requires `workspace` field
+- **MCP Server Enhancement**: Expanded from 4 to 7 total MCP tools for comprehensive Go code navigation and discovery
 - **BREAKING**: No backward compatibility - old single-workspace usage patterns no longer supported
 - Updated Dockerfile CMD to use `-workspaces` flag instead of `-workspace`
 - Enhanced documentation with multi-workspace usage examples and Docker deployment patterns

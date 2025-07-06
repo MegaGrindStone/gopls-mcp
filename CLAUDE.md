@@ -125,6 +125,9 @@ gh release delete v1.0.0
 2. **find_references**: Find all references to a symbol
 3. **get_hover_info**: Get documentation and type information
 4. **list_workspaces**: List all available workspaces and their status
+5. **get_document_symbols**: Get all symbols (functions, types, variables, etc.) in a specific Go file
+6. **search_workspace_symbols**: Search for symbols across the entire Go workspace using fuzzy matching
+7. **go_to_type_definition**: Navigate to the type definition of a symbol at the specified position
 
 ## Usage Examples
 
@@ -242,6 +245,44 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
 {
   "name": "list_workspaces",
   "arguments": {}
+}
+```
+
+#### Get Document Symbols
+
+```json
+{
+  "name": "get_document_symbols",
+  "arguments": {
+    "workspace": "/path/to/workspace",
+    "uri": "file:///path/to/file.go"
+  }
+}
+```
+
+#### Search Workspace Symbols
+
+```json
+{
+  "name": "search_workspace_symbols",
+  "arguments": {
+    "workspace": "/path/to/workspace",
+    "query": "TestFunction"
+  }
+}
+```
+
+#### Go to Type Definition
+
+```json
+{
+  "name": "go_to_type_definition",
+  "arguments": {
+    "workspace": "/path/to/workspace",
+    "uri": "file:///path/to/file.go",
+    "line": 10,
+    "character": 5
+  }
 }
 ```
 
