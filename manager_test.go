@@ -884,4 +884,401 @@ func TestManagerNewLSPMethodsWhenNotRunning(t *testing.T) {
 	if err == nil {
 		t.Error("GoToTypeDefinition() on non-running manager should return error")
 	}
+
+	// Test GetDiagnostics when not running
+	_, err = manager.GetDiagnostics(ctx, "file:///test.go")
+	if err == nil {
+		t.Error("GetDiagnostics() on non-running manager should return error")
+	}
+
+	// Test FindImplementations when not running
+	_, err = manager.FindImplementations(ctx, "file:///test.go", 10, 5)
+	if err == nil {
+		t.Error("FindImplementations() on non-running manager should return error")
+	}
+
+	// Test GetCompletions when not running
+	_, err = manager.GetCompletions(ctx, "file:///test.go", 10, 5)
+	if err == nil {
+		t.Error("GetCompletions() on non-running manager should return error")
+	}
+}
+
+// Tests for Phase 2 parameter types.
+func TestGetDiagnosticsParams(t *testing.T) {
+	params := GetDiagnosticsParams{
+		Workspace: "/test/workspace",
+		URI:       "file:///test.go",
+	}
+
+	// Test JSON marshaling
+	data, err := json.Marshal(params)
+	if err != nil {
+		t.Errorf("json.Marshal(GetDiagnosticsParams) error = %v", err)
+	}
+
+	// Test JSON unmarshaling
+	var unmarshaled GetDiagnosticsParams
+	err = json.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Errorf("json.Unmarshal(GetDiagnosticsParams) error = %v", err)
+	}
+
+	if unmarshaled.Workspace != params.Workspace {
+		t.Errorf("JSON roundtrip failed: got workspace=%v, want %v", unmarshaled.Workspace, params.Workspace)
+	}
+	if unmarshaled.URI != params.URI {
+		t.Errorf("JSON roundtrip failed: got uri=%v, want %v", unmarshaled.URI, params.URI)
+	}
+}
+
+func TestFindImplementationsParams(t *testing.T) {
+	params := FindImplementationsParams{
+		Workspace: "/test/workspace",
+		URI:       "file:///test.go",
+		Line:      10,
+		Character: 5,
+	}
+
+	// Test JSON marshaling
+	data, err := json.Marshal(params)
+	if err != nil {
+		t.Errorf("json.Marshal(FindImplementationsParams) error = %v", err)
+	}
+
+	// Test JSON unmarshaling
+	var unmarshaled FindImplementationsParams
+	err = json.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Errorf("json.Unmarshal(FindImplementationsParams) error = %v", err)
+	}
+
+	if unmarshaled.Workspace != params.Workspace {
+		t.Errorf("JSON roundtrip failed: got workspace=%v, want %v", unmarshaled.Workspace, params.Workspace)
+	}
+	if unmarshaled.Line != params.Line {
+		t.Errorf("JSON roundtrip failed: got line=%v, want %v", unmarshaled.Line, params.Line)
+	}
+	if unmarshaled.Character != params.Character {
+		t.Errorf("JSON roundtrip failed: got character=%v, want %v", unmarshaled.Character, params.Character)
+	}
+}
+
+func TestGetCompletionsParams(t *testing.T) {
+	params := GetCompletionsParams{
+		Workspace: "/test/workspace",
+		URI:       "file:///test.go",
+		Line:      10,
+		Character: 5,
+	}
+
+	// Test JSON marshaling
+	data, err := json.Marshal(params)
+	if err != nil {
+		t.Errorf("json.Marshal(GetCompletionsParams) error = %v", err)
+	}
+
+	// Test JSON unmarshaling
+	var unmarshaled GetCompletionsParams
+	err = json.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Errorf("json.Unmarshal(GetCompletionsParams) error = %v", err)
+	}
+
+	if unmarshaled.Workspace != params.Workspace {
+		t.Errorf("JSON roundtrip failed: got workspace=%v, want %v", unmarshaled.Workspace, params.Workspace)
+	}
+	if unmarshaled.Line != params.Line {
+		t.Errorf("JSON roundtrip failed: got line=%v, want %v", unmarshaled.Line, params.Line)
+	}
+	if unmarshaled.Character != params.Character {
+		t.Errorf("JSON roundtrip failed: got character=%v, want %v", unmarshaled.Character, params.Character)
+	}
+}
+
+// Tests for Phase 2 result types.
+func TestDiagnosticResult(t *testing.T) {
+	result := DiagnosticResult{
+		Range: LocationResult{
+			URI:          "file:///test.go",
+			Line:         10,
+			Character:    5,
+			EndLine:      10,
+			EndCharacter: 15,
+		},
+		Severity: 1, // Error
+		Code:     "unused",
+		Source:   "gopls",
+		Message:  "variable declared but not used",
+		Tags:     []int{1}, // Unnecessary
+	}
+
+	// Test JSON marshaling
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Errorf("json.Marshal(DiagnosticResult) error = %v", err)
+	}
+
+	// Test JSON unmarshaling
+	var unmarshaled DiagnosticResult
+	err = json.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Errorf("json.Unmarshal(DiagnosticResult) error = %v", err)
+	}
+
+	if unmarshaled.Severity != result.Severity {
+		t.Errorf("JSON roundtrip failed: got severity=%v, want %v", unmarshaled.Severity, result.Severity)
+	}
+	if unmarshaled.Message != result.Message {
+		t.Errorf("JSON roundtrip failed: got message=%v, want %v", unmarshaled.Message, result.Message)
+	}
+	if len(unmarshaled.Tags) != len(result.Tags) {
+		t.Errorf("JSON roundtrip failed: got %d tags, want %d", len(unmarshaled.Tags), len(result.Tags))
+	}
+}
+
+func TestGetDiagnosticsResult(t *testing.T) {
+	result := GetDiagnosticsResult{
+		Diagnostics: []DiagnosticResult{
+			{
+				Range: LocationResult{
+					URI:          "file:///test.go",
+					Line:         10,
+					Character:    5,
+					EndLine:      10,
+					EndCharacter: 15,
+				},
+				Severity: 1,
+				Message:  "variable declared but not used",
+			},
+		},
+	}
+
+	// Test JSON marshaling
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Errorf("json.Marshal(GetDiagnosticsResult) error = %v", err)
+	}
+
+	// Test JSON unmarshaling
+	var unmarshaled GetDiagnosticsResult
+	err = json.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Errorf("json.Unmarshal(GetDiagnosticsResult) error = %v", err)
+	}
+
+	if len(unmarshaled.Diagnostics) != len(result.Diagnostics) {
+		t.Errorf("JSON roundtrip failed: got %d diagnostics, want %d", len(unmarshaled.Diagnostics), len(result.Diagnostics))
+	}
+}
+
+func TestFindImplementationsResult(t *testing.T) {
+	result := FindImplementationsResult{
+		Locations: []LocationResult{
+			{
+				URI:          "file:///impl.go",
+				Line:         20,
+				Character:    0,
+				EndLine:      25,
+				EndCharacter: 1,
+			},
+		},
+	}
+
+	// Test JSON marshaling
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Errorf("json.Marshal(FindImplementationsResult) error = %v", err)
+	}
+
+	// Test JSON unmarshaling
+	var unmarshaled FindImplementationsResult
+	err = json.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Errorf("json.Unmarshal(FindImplementationsResult) error = %v", err)
+	}
+
+	if len(unmarshaled.Locations) != len(result.Locations) {
+		t.Errorf("JSON roundtrip failed: got %d locations, want %d", len(unmarshaled.Locations), len(result.Locations))
+	}
+}
+
+func TestCompletionItemResult(t *testing.T) {
+	result := CompletionItemResult{
+		Label:            "TestFunction",
+		Kind:             3, // Function
+		Detail:           "func TestFunction()",
+		Documentation:    "Test function documentation",
+		Deprecated:       false,
+		Preselect:        true,
+		SortText:         "TestFunction",
+		FilterText:       "TestFunction",
+		InsertText:       "TestFunction()",
+		InsertTextFormat: 1, // PlainText
+		Tags:             []int{},
+	}
+
+	// Test JSON marshaling
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Errorf("json.Marshal(CompletionItemResult) error = %v", err)
+	}
+
+	// Test JSON unmarshaling
+	var unmarshaled CompletionItemResult
+	err = json.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Errorf("json.Unmarshal(CompletionItemResult) error = %v", err)
+	}
+
+	if unmarshaled.Label != result.Label {
+		t.Errorf("JSON roundtrip failed: got label=%v, want %v", unmarshaled.Label, result.Label)
+	}
+	if unmarshaled.Kind != result.Kind {
+		t.Errorf("JSON roundtrip failed: got kind=%v, want %v", unmarshaled.Kind, result.Kind)
+	}
+	if unmarshaled.Preselect != result.Preselect {
+		t.Errorf("JSON roundtrip failed: got preselect=%v, want %v", unmarshaled.Preselect, result.Preselect)
+	}
+}
+
+func TestGetCompletionsResult(t *testing.T) {
+	result := GetCompletionsResult{
+		Items: []CompletionItemResult{
+			{
+				Label:         "TestFunction",
+				Kind:          3,
+				Detail:        "func TestFunction()",
+				Documentation: "Test function documentation",
+			},
+		},
+	}
+
+	// Test JSON marshaling
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Errorf("json.Marshal(GetCompletionsResult) error = %v", err)
+	}
+
+	// Test JSON unmarshaling
+	var unmarshaled GetCompletionsResult
+	err = json.Unmarshal(data, &unmarshaled)
+	if err != nil {
+		t.Errorf("json.Unmarshal(GetCompletionsResult) error = %v", err)
+	}
+
+	if len(unmarshaled.Items) != len(result.Items) {
+		t.Errorf("JSON roundtrip failed: got %d items, want %d", len(unmarshaled.Items), len(result.Items))
+	}
+}
+
+// Tests for Phase 2 MCP tool handlers.
+func TestWorkspaceManagerPhase2ToolHandlersWhenNotRunning(t *testing.T) {
+	logger := newTestLogger()
+	workspaces := []string{"/test/workspace1", "/test/workspace2"}
+	workspaceManager := NewWorkspaceManager(workspaces, logger)
+	ctx := context.Background()
+
+	// Test HandleGetDiagnostics when not running
+	diagParams := &mcp.CallToolParamsFor[GetDiagnosticsParams]{
+		Arguments: GetDiagnosticsParams{
+			Workspace: "/test/workspace1",
+			URI:       "file:///test.go",
+		},
+	}
+	_, err := workspaceManager.HandleGetDiagnostics(ctx, nil, diagParams)
+	if err == nil {
+		t.Error("HandleGetDiagnostics() on non-running workspace manager should return error")
+	}
+
+	// Test HandleFindImplementations when not running
+	implParams := &mcp.CallToolParamsFor[FindImplementationsParams]{
+		Arguments: FindImplementationsParams{
+			Workspace: "/test/workspace1",
+			URI:       "file:///test.go",
+			Line:      10,
+			Character: 5,
+		},
+	}
+	_, err = workspaceManager.HandleFindImplementations(ctx, nil, implParams)
+	if err == nil {
+		t.Error("HandleFindImplementations() on non-running workspace manager should return error")
+	}
+
+	// Test HandleGetCompletions when not running
+	compParams := &mcp.CallToolParamsFor[GetCompletionsParams]{
+		Arguments: GetCompletionsParams{
+			Workspace: "/test/workspace1",
+			URI:       "file:///test.go",
+			Line:      10,
+			Character: 5,
+		},
+	}
+	_, err = workspaceManager.HandleGetCompletions(ctx, nil, compParams)
+	if err == nil {
+		t.Error("HandleGetCompletions() on non-running workspace manager should return error")
+	}
+
+	// Test with nonexistent workspace
+	badDiagParams := &mcp.CallToolParamsFor[GetDiagnosticsParams]{
+		Arguments: GetDiagnosticsParams{
+			Workspace: "/nonexistent/workspace",
+			URI:       "file:///test.go",
+		},
+	}
+	_, err = workspaceManager.HandleGetDiagnostics(ctx, nil, badDiagParams)
+	if err == nil {
+		t.Error("HandleGetDiagnostics() with nonexistent workspace should return error")
+	}
+
+	badImplParams := &mcp.CallToolParamsFor[FindImplementationsParams]{
+		Arguments: FindImplementationsParams{
+			Workspace: "/nonexistent/workspace",
+			URI:       "file:///test.go",
+			Line:      10,
+			Character: 5,
+		},
+	}
+	_, err = workspaceManager.HandleFindImplementations(ctx, nil, badImplParams)
+	if err == nil {
+		t.Error("HandleFindImplementations() with nonexistent workspace should return error")
+	}
+
+	badCompParams := &mcp.CallToolParamsFor[GetCompletionsParams]{
+		Arguments: GetCompletionsParams{
+			Workspace: "/nonexistent/workspace",
+			URI:       "file:///test.go",
+			Line:      10,
+			Character: 5,
+		},
+	}
+	_, err = workspaceManager.HandleGetCompletions(ctx, nil, badCompParams)
+	if err == nil {
+		t.Error("HandleGetCompletions() with nonexistent workspace should return error")
+	}
+}
+
+// Tests for Phase 2 tool creation.
+func TestWorkspaceManagerCreatePhase2Tools(t *testing.T) {
+	logger := newTestLogger()
+	workspaces := []string{"/test/workspace1", "/test/workspace2"}
+	workspaceManager := NewWorkspaceManager(workspaces, logger)
+
+	// Test CreateGetDiagnosticsTool
+	tool := workspaceManager.CreateGetDiagnosticsTool()
+	if tool == nil {
+		t.Error("CreateGetDiagnosticsTool() returned nil")
+	}
+
+	// Test CreateFindImplementationsTool
+	tool = workspaceManager.CreateFindImplementationsTool()
+	if tool == nil {
+		t.Error("CreateFindImplementationsTool() returned nil")
+	}
+
+	// Test CreateGetCompletionsTool
+	tool = workspaceManager.CreateGetCompletionsTool()
+	if tool == nil {
+		t.Error("CreateGetCompletionsTool() returned nil")
+	}
 }

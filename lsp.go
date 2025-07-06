@@ -112,6 +112,89 @@ type WorkspaceSymbolParams struct {
 	Query string `json:"query"`
 }
 
+// DiagnosticSeverity represents the severity of a diagnostic.
+type DiagnosticSeverity int
+
+// DiagnosticSeverity constants as defined in the LSP specification.
+const (
+	DiagnosticSeverityError       DiagnosticSeverity = 1
+	DiagnosticSeverityWarning     DiagnosticSeverity = 2
+	DiagnosticSeverityInformation DiagnosticSeverity = 3
+	DiagnosticSeverityHint        DiagnosticSeverity = 4
+)
+
+// DiagnosticTag represents a tag for a diagnostic.
+type DiagnosticTag int
+
+// DiagnosticTag constants as defined in the LSP specification.
+const (
+	DiagnosticTagUnnecessary DiagnosticTag = 1
+	DiagnosticTagDeprecated  DiagnosticTag = 2
+)
+
+// Diagnostic represents a diagnostic, such as a compile error or warning.
+type Diagnostic struct {
+	Range              Range              `json:"range"`
+	Severity           DiagnosticSeverity `json:"severity"`
+	Code               string             `json:"code,omitempty"`
+	Source             string             `json:"source,omitempty"`
+	Message            string             `json:"message"`
+	Tags               []DiagnosticTag    `json:"tags,omitempty"`
+	RelatedInformation []any              `json:"relatedInformation,omitempty"`
+}
+
+// CompletionItemKind represents the kind of a completion item.
+type CompletionItemKind int
+
+// CompletionItemKind constants as defined in the LSP specification.
+const (
+	CompletionItemKindText          CompletionItemKind = 1
+	CompletionItemKindMethod        CompletionItemKind = 2
+	CompletionItemKindFunction      CompletionItemKind = 3
+	CompletionItemKindConstructor   CompletionItemKind = 4
+	CompletionItemKindField         CompletionItemKind = 5
+	CompletionItemKindVariable      CompletionItemKind = 6
+	CompletionItemKindClass         CompletionItemKind = 7
+	CompletionItemKindInterface     CompletionItemKind = 8
+	CompletionItemKindModule        CompletionItemKind = 9
+	CompletionItemKindProperty      CompletionItemKind = 10
+	CompletionItemKindUnit          CompletionItemKind = 11
+	CompletionItemKindValue         CompletionItemKind = 12
+	CompletionItemKindEnum          CompletionItemKind = 13
+	CompletionItemKindKeyword       CompletionItemKind = 14
+	CompletionItemKindSnippet       CompletionItemKind = 15
+	CompletionItemKindColor         CompletionItemKind = 16
+	CompletionItemKindFile          CompletionItemKind = 17
+	CompletionItemKindReference     CompletionItemKind = 18
+	CompletionItemKindFolder        CompletionItemKind = 19
+	CompletionItemKindEnumMember    CompletionItemKind = 20
+	CompletionItemKindConstant      CompletionItemKind = 21
+	CompletionItemKindStruct        CompletionItemKind = 22
+	CompletionItemKindEvent         CompletionItemKind = 23
+	CompletionItemKindOperator      CompletionItemKind = 24
+	CompletionItemKindTypeParameter CompletionItemKind = 25
+)
+
+// CompletionItem represents a completion item.
+type CompletionItem struct {
+	Label               string             `json:"label"`
+	Kind                CompletionItemKind `json:"kind"`
+	Tags                []int              `json:"tags,omitempty"`
+	Detail              string             `json:"detail,omitempty"`
+	Documentation       string             `json:"documentation,omitempty"`
+	Deprecated          bool               `json:"deprecated,omitempty"`
+	Preselect           bool               `json:"preselect,omitempty"`
+	SortText            string             `json:"sortText,omitempty"`
+	FilterText          string             `json:"filterText,omitempty"`
+	InsertText          string             `json:"insertText,omitempty"`
+	InsertTextFormat    int                `json:"insertTextFormat,omitempty"`
+	TextEdit            any                `json:"textEdit,omitempty"`
+	AdditionalTextEdits []any              `json:"additionalTextEdits,omitempty"`
+	CommitCharacters    []string           `json:"commitCharacters,omitempty"`
+	Command             any                `json:"command,omitempty"`
+	Data                any                `json:"data,omitempty"`
+}
+
 // GoToDefinition sends a textDocument/definition request to gopls.
 func (m *Manager) GoToDefinition(_ context.Context, uri string, line, character int) ([]Location, error) {
 	m.logger.Debug("GoToDefinition called", "uri", uri, "line", line, "character", character)
@@ -328,6 +411,107 @@ func (m *Manager) GoToTypeDefinition(_ context.Context, uri string, line, charac
 	return parseLocationsFromResponse(response)
 }
 
+// GetDiagnostics sends a textDocument/diagnostic request to gopls.
+func (m *Manager) GetDiagnostics(_ context.Context, uri string) ([]Diagnostic, error) {
+	m.logger.Debug("GetDiagnostics called", "uri", uri)
+
+	if !m.IsRunning() {
+		return nil, fmt.Errorf("gopls is not running")
+	}
+
+	// Ensure file is open in gopls
+	if err := m.ensureFileOpen(uri); err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
+	}
+
+	request := map[string]any{
+		"jsonrpc": "2.0",
+		"id":      m.nextRequestID(),
+		"method":  "textDocument/diagnostic",
+		"params": map[string]any{
+			"textDocument": TextDocumentIdentifier{URI: uri},
+		},
+	}
+
+	response, err := m.sendRequestAndWait(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get diagnostics: %w", err)
+	}
+
+	// Extract diagnostics from response
+	return parseDiagnosticsFromResponse(response)
+}
+
+// FindImplementations sends a textDocument/implementation request to gopls.
+func (m *Manager) FindImplementations(_ context.Context, uri string, line, character int) ([]Location, error) {
+	m.logger.Debug("FindImplementations called", "uri", uri, "line", line, "character", character)
+
+	if !m.IsRunning() {
+		return nil, fmt.Errorf("gopls is not running")
+	}
+
+	// Ensure file is open in gopls
+	if err := m.ensureFileOpen(uri); err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
+	}
+
+	request := map[string]any{
+		"jsonrpc": "2.0",
+		"id":      m.nextRequestID(),
+		"method":  "textDocument/implementation",
+		"params": TextDocumentPositionParams{
+			TextDocument: TextDocumentIdentifier{URI: uri},
+			Position: Position{
+				Line:      line,
+				Character: character,
+			},
+		},
+	}
+
+	response, err := m.sendRequestAndWait(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find implementations: %w", err)
+	}
+
+	// Extract locations from response (reuse existing parser)
+	return parseLocationsFromResponse(response)
+}
+
+// GetCompletions sends a textDocument/completion request to gopls.
+func (m *Manager) GetCompletions(_ context.Context, uri string, line, character int) ([]CompletionItem, error) {
+	m.logger.Debug("GetCompletions called", "uri", uri, "line", line, "character", character)
+
+	if !m.IsRunning() {
+		return nil, fmt.Errorf("gopls is not running")
+	}
+
+	// Ensure file is open in gopls
+	if err := m.ensureFileOpen(uri); err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
+	}
+
+	request := map[string]any{
+		"jsonrpc": "2.0",
+		"id":      m.nextRequestID(),
+		"method":  "textDocument/completion",
+		"params": TextDocumentPositionParams{
+			TextDocument: TextDocumentIdentifier{URI: uri},
+			Position: Position{
+				Line:      line,
+				Character: character,
+			},
+		},
+	}
+
+	response, err := m.sendRequestAndWait(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get completions: %w", err)
+	}
+
+	// Extract completions from response
+	return parseCompletionsFromResponse(response)
+}
+
 // parseRange parses a range from a map.
 func parseRange(rangeMap map[string]any) Range {
 	var rng Range
@@ -518,4 +702,165 @@ func parseWorkspaceSymbolsFromResponse(response map[string]any) ([]SymbolInforma
 		}
 	}
 	return workspaceSymbols, nil
+}
+
+// parseDiagnosticFromMap parses a single diagnostic from a map.
+func parseDiagnosticFromMap(diagMap map[string]any) Diagnostic {
+	var diagnostic Diagnostic
+
+	if rangeMap, rangeMapOk := diagMap["range"].(map[string]any); rangeMapOk {
+		diagnostic.Range = parseRange(rangeMap)
+	}
+	if severity, severityOk := diagMap["severity"].(float64); severityOk {
+		diagnostic.Severity = DiagnosticSeverity(int(severity))
+	}
+	if code, codeOk := diagMap["code"].(string); codeOk {
+		diagnostic.Code = code
+	}
+	if source, sourceOk := diagMap["source"].(string); sourceOk {
+		diagnostic.Source = source
+	}
+	if message, messageOk := diagMap["message"].(string); messageOk {
+		diagnostic.Message = message
+	}
+	if tags, tagsOk := diagMap["tags"].([]any); tagsOk {
+		for _, tag := range tags {
+			if tagFloat, tagFloatOk := tag.(float64); tagFloatOk {
+				diagnostic.Tags = append(diagnostic.Tags, DiagnosticTag(int(tagFloat)))
+			}
+		}
+	}
+	if relatedInfo, relatedInfoOk := diagMap["relatedInformation"]; relatedInfoOk {
+		diagnostic.RelatedInformation = []any{relatedInfo}
+	}
+
+	return diagnostic
+}
+
+// parseDiagnosticsFromResponse extracts diagnostics from LSP response.
+func parseDiagnosticsFromResponse(response map[string]any) ([]Diagnostic, error) {
+	result, resultOk := response["result"]
+	if !resultOk {
+		return nil, fmt.Errorf("invalid response format")
+	}
+
+	// Handle both direct array and object with items array
+	var diagnosticsArray []any
+	if diagArray, diagArrayOk := result.([]any); diagArrayOk {
+		diagnosticsArray = diagArray
+	} else if resultMap, resultMapOk := result.(map[string]any); resultMapOk {
+		if items, itemsOk := resultMap["items"].([]any); itemsOk {
+			diagnosticsArray = items
+		} else {
+			return nil, fmt.Errorf("invalid diagnostics response format")
+		}
+	} else {
+		return nil, fmt.Errorf("invalid diagnostics response format")
+	}
+
+	var diagnostics []Diagnostic
+	for _, diag := range diagnosticsArray {
+		if diagMap, diagMapOk := diag.(map[string]any); diagMapOk {
+			diagnostic := parseDiagnosticFromMap(diagMap)
+			diagnostics = append(diagnostics, diagnostic)
+		}
+	}
+	return diagnostics, nil
+}
+
+// parseCompletionItemFromMap parses a single completion item from a map.
+func parseCompletionItemFromMap(itemMap map[string]any) CompletionItem {
+	var item CompletionItem
+
+	if label, labelOk := itemMap["label"].(string); labelOk {
+		item.Label = label
+	}
+	if kind, kindOk := itemMap["kind"].(float64); kindOk {
+		item.Kind = CompletionItemKind(int(kind))
+	}
+	if detail, detailOk := itemMap["detail"].(string); detailOk {
+		item.Detail = detail
+	}
+	if documentation, docOk := itemMap["documentation"].(string); docOk {
+		item.Documentation = documentation
+	}
+	if deprecated, deprecatedOk := itemMap["deprecated"].(bool); deprecatedOk {
+		item.Deprecated = deprecated
+	}
+	if preselect, preselectOk := itemMap["preselect"].(bool); preselectOk {
+		item.Preselect = preselect
+	}
+	if sortText, sortTextOk := itemMap["sortText"].(string); sortTextOk {
+		item.SortText = sortText
+	}
+	if filterText, filterTextOk := itemMap["filterText"].(string); filterTextOk {
+		item.FilterText = filterText
+	}
+	if insertText, insertTextOk := itemMap["insertText"].(string); insertTextOk {
+		item.InsertText = insertText
+	}
+	if insertTextFormat, insertTextFormatOk := itemMap["insertTextFormat"].(float64); insertTextFormatOk {
+		item.InsertTextFormat = int(insertTextFormat)
+	}
+	if tags, tagsOk := itemMap["tags"].([]any); tagsOk {
+		for _, tag := range tags {
+			if tagFloat, tagFloatOk := tag.(float64); tagFloatOk {
+				item.Tags = append(item.Tags, int(tagFloat))
+			}
+		}
+	}
+	if commitCharacters, commitCharactersOk := itemMap["commitCharacters"].([]any); commitCharactersOk {
+		for _, char := range commitCharacters {
+			if charStr, charStrOk := char.(string); charStrOk {
+				item.CommitCharacters = append(item.CommitCharacters, charStr)
+			}
+		}
+	}
+	if textEdit, textEditOk := itemMap["textEdit"]; textEditOk {
+		item.TextEdit = textEdit
+	}
+	if additionalTextEdits, additionalTextEditsOk := itemMap["additionalTextEdits"]; additionalTextEditsOk {
+		if editsArray, editsArrayOk := additionalTextEdits.([]any); editsArrayOk {
+			item.AdditionalTextEdits = editsArray
+		}
+	}
+	if command, commandOk := itemMap["command"]; commandOk {
+		item.Command = command
+	}
+	if data, dataOk := itemMap["data"]; dataOk {
+		item.Data = data
+	}
+
+	return item
+}
+
+// parseCompletionsFromResponse extracts completion items from LSP response.
+func parseCompletionsFromResponse(response map[string]any) ([]CompletionItem, error) {
+	result, resultOk := response["result"]
+	if !resultOk {
+		return nil, fmt.Errorf("invalid response format")
+	}
+
+	// Handle both direct array and object with items array
+	var itemsArray []any
+	if items, itemsOk := result.([]any); itemsOk {
+		itemsArray = items
+	} else if resultMap, resultMapOk := result.(map[string]any); resultMapOk {
+		if itemsData, itemsDataOk := resultMap["items"].([]any); itemsDataOk {
+			itemsArray = itemsData
+		} else {
+			return nil, fmt.Errorf("invalid completions response format")
+		}
+	} else {
+		return nil, fmt.Errorf("invalid completions response format")
+	}
+
+	var completions []CompletionItem
+	for _, item := range itemsArray {
+		if itemMap, itemMapOk := item.(map[string]any); itemMapOk {
+			completion := parseCompletionItemFromMap(itemMap)
+			completions = append(completions, completion)
+		}
+	}
+	return completions, nil
 }

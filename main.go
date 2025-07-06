@@ -136,6 +136,9 @@ func setupMCPServer(workspaceManager *WorkspaceManager) *mcp.Server {
 		workspaceManager.CreateGetDocumentSymbolsTool(),
 		workspaceManager.CreateSearchWorkspaceSymbolsTool(),
 		workspaceManager.CreateGoToTypeDefinitionTool(),
+		workspaceManager.CreateGetDiagnosticsTool(),
+		workspaceManager.CreateFindImplementationsTool(),
+		workspaceManager.CreateGetCompletionsTool(),
 	)
 
 	return server

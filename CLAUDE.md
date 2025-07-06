@@ -121,6 +121,7 @@ gh release delete v1.0.0
 
 ### Available MCP Tools
 
+#### Phase 1: Core Navigation and Discovery Tools
 1. **go_to_definition**: Navigate to symbol definitions
 2. **find_references**: Find all references to a symbol
 3. **get_hover_info**: Get documentation and type information
@@ -128,6 +129,11 @@ gh release delete v1.0.0
 5. **get_document_symbols**: Get all symbols (functions, types, variables, etc.) in a specific Go file
 6. **search_workspace_symbols**: Search for symbols across the entire Go workspace using fuzzy matching
 7. **go_to_type_definition**: Navigate to the type definition of a symbol at the specified position
+
+#### Phase 2: Code Quality & Analysis Tools
+8. **get_diagnostics**: Retrieve compile errors, warnings, and static analysis results for a Go file
+9. **find_implementations**: Find concrete implementations of interfaces at the specified position
+10. **get_completions**: Provide code completion suggestions at the specified position in a Go file
 
 ## Usage Examples
 
@@ -277,6 +283,46 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
 ```json
 {
   "name": "go_to_type_definition",
+  "arguments": {
+    "workspace": "/path/to/workspace",
+    "uri": "file:///path/to/file.go",
+    "line": 10,
+    "character": 5
+  }
+}
+```
+
+#### Get Diagnostics
+
+```json
+{
+  "name": "get_diagnostics",
+  "arguments": {
+    "workspace": "/path/to/workspace",
+    "uri": "file:///path/to/file.go"
+  }
+}
+```
+
+#### Find Implementations
+
+```json
+{
+  "name": "find_implementations",
+  "arguments": {
+    "workspace": "/path/to/workspace",
+    "uri": "file:///path/to/file.go",
+    "line": 10,
+    "character": 5
+  }
+}
+```
+
+#### Get Completions
+
+```json
+{
+  "name": "get_completions",
   "arguments": {
     "workspace": "/path/to/workspace",
     "uri": "file:///path/to/file.go",

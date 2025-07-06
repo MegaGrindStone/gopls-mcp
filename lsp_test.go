@@ -814,3 +814,338 @@ func TestParseWorkspaceSymbolsFromResponse(t *testing.T) {
 		})
 	}
 }
+
+func TestParseDiagnosticFromMap(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    map[string]any
+		expected Diagnostic
+	}{
+		{
+			name: "valid diagnostic",
+			input: map[string]any{
+				"range": map[string]any{
+					"start": map[string]any{
+						"line":      float64(10),
+						"character": float64(5),
+					},
+					"end": map[string]any{
+						"line":      float64(10),
+						"character": float64(15),
+					},
+				},
+				"severity": float64(1),
+				"code":     "unused",
+				"source":   "gopls",
+				"message":  "variable declared but not used",
+				"tags":     []any{float64(1)},
+			},
+			expected: Diagnostic{
+				Range: Range{
+					Start: Position{Line: 10, Character: 5},
+					End:   Position{Line: 10, Character: 15},
+				},
+				Severity: DiagnosticSeverityError,
+				Code:     "unused",
+				Source:   "gopls",
+				Message:  "variable declared but not used",
+				Tags:     []DiagnosticTag{DiagnosticTagUnnecessary},
+			},
+		},
+		{
+			name:     "empty diagnostic",
+			input:    map[string]any{},
+			expected: Diagnostic{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := parseDiagnosticFromMap(tt.input)
+			if result.Severity != tt.expected.Severity {
+				t.Errorf("parseDiagnosticFromMap() severity = %v, want %v", result.Severity, tt.expected.Severity)
+			}
+			if result.Message != tt.expected.Message {
+				t.Errorf("parseDiagnosticFromMap() message = %v, want %v", result.Message, tt.expected.Message)
+			}
+			if len(result.Tags) != len(tt.expected.Tags) {
+				t.Errorf("parseDiagnosticFromMap() tags count = %v, want %v", len(result.Tags), len(tt.expected.Tags))
+			}
+		})
+	}
+}
+
+func TestParseDiagnosticsFromResponse(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         map[string]any
+		expected      []Diagnostic
+		expectedError bool
+	}{
+		{
+			name: "valid diagnostics response (direct array)",
+			input: map[string]any{
+				"result": []any{
+					map[string]any{
+						"range": map[string]any{
+							"start": map[string]any{
+								"line":      float64(10),
+								"character": float64(5),
+							},
+							"end": map[string]any{
+								"line":      float64(10),
+								"character": float64(15),
+							},
+						},
+						"severity": float64(1),
+						"message":  "variable declared but not used",
+					},
+				},
+			},
+			expected: []Diagnostic{
+				{
+					Range: Range{
+						Start: Position{Line: 10, Character: 5},
+						End:   Position{Line: 10, Character: 15},
+					},
+					Severity: DiagnosticSeverityError,
+					Message:  "variable declared but not used",
+				},
+			},
+		},
+		{
+			name: "valid diagnostics response (items object)",
+			input: map[string]any{
+				"result": map[string]any{
+					"items": []any{
+						map[string]any{
+							"range": map[string]any{
+								"start": map[string]any{
+									"line":      float64(5),
+									"character": float64(0),
+								},
+								"end": map[string]any{
+									"line":      float64(5),
+									"character": float64(10),
+								},
+							},
+							"severity": float64(2),
+							"message":  "unused import",
+						},
+					},
+				},
+			},
+			expected: []Diagnostic{
+				{
+					Range: Range{
+						Start: Position{Line: 5, Character: 0},
+						End:   Position{Line: 5, Character: 10},
+					},
+					Severity: DiagnosticSeverityWarning,
+					Message:  "unused import",
+				},
+			},
+		},
+		{
+			name: "empty diagnostics response",
+			input: map[string]any{
+				"result": []any{},
+			},
+			expected: []Diagnostic{},
+		},
+		{
+			name: "missing result",
+			input: map[string]any{
+				"error": "some error",
+			},
+			expectedError: true,
+		},
+		{
+			name: "invalid result type",
+			input: map[string]any{
+				"result": "invalid",
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parseDiagnosticsFromResponse(tt.input)
+			if tt.expectedError {
+				if err == nil {
+					t.Errorf("parseDiagnosticsFromResponse() expected error but got none")
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("parseDiagnosticsFromResponse() error = %v", err)
+				return
+			}
+			if len(result) != len(tt.expected) {
+				t.Errorf("parseDiagnosticsFromResponse() count = %v, want %v", len(result), len(tt.expected))
+			}
+			for i, diag := range result {
+				if i < len(tt.expected) && diag.Message != tt.expected[i].Message {
+					t.Errorf("parseDiagnosticsFromResponse() diagnostic[%d].message = %v, want %v",
+						i, diag.Message, tt.expected[i].Message)
+				}
+			}
+		})
+	}
+}
+
+func TestParseCompletionItemFromMap(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    map[string]any
+		expected CompletionItem
+	}{
+		{
+			name: "valid completion item",
+			input: map[string]any{
+				"label":            "TestFunction",
+				"kind":             float64(3),
+				"detail":           "func TestFunction()",
+				"documentation":    "Test function documentation",
+				"deprecated":       false,
+				"preselect":        true,
+				"sortText":         "TestFunction",
+				"filterText":       "TestFunction",
+				"insertText":       "TestFunction()",
+				"insertTextFormat": float64(1),
+				"tags":             []any{},
+				"commitCharacters": []any{"(", ")"},
+			},
+			expected: CompletionItem{
+				Label:            "TestFunction",
+				Kind:             CompletionItemKindFunction,
+				Detail:           "func TestFunction()",
+				Documentation:    "Test function documentation",
+				Deprecated:       false,
+				Preselect:        true,
+				SortText:         "TestFunction",
+				FilterText:       "TestFunction",
+				InsertText:       "TestFunction()",
+				InsertTextFormat: 1,
+				Tags:             []int{},
+				CommitCharacters: []string{"(", ")"},
+			},
+		},
+		{
+			name:     "empty completion item",
+			input:    map[string]any{},
+			expected: CompletionItem{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := parseCompletionItemFromMap(tt.input)
+			if result.Label != tt.expected.Label {
+				t.Errorf("parseCompletionItemFromMap() label = %v, want %v", result.Label, tt.expected.Label)
+			}
+			if result.Kind != tt.expected.Kind {
+				t.Errorf("parseCompletionItemFromMap() kind = %v, want %v", result.Kind, tt.expected.Kind)
+			}
+			if result.Preselect != tt.expected.Preselect {
+				t.Errorf("parseCompletionItemFromMap() preselect = %v, want %v", result.Preselect, tt.expected.Preselect)
+			}
+			if len(result.CommitCharacters) != len(tt.expected.CommitCharacters) {
+				t.Errorf("parseCompletionItemFromMap() commitCharacters count = %v, want %v",
+					len(result.CommitCharacters), len(tt.expected.CommitCharacters))
+			}
+		})
+	}
+}
+
+func TestParseCompletionsFromResponse(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         map[string]any
+		expected      []CompletionItem
+		expectedError bool
+	}{
+		{
+			name: "valid completions response (direct array)",
+			input: map[string]any{
+				"result": []any{
+					map[string]any{
+						"label": "TestFunction",
+						"kind":  float64(3),
+					},
+				},
+			},
+			expected: []CompletionItem{
+				{
+					Label: "TestFunction",
+					Kind:  CompletionItemKindFunction,
+				},
+			},
+		},
+		{
+			name: "valid completions response (items object)",
+			input: map[string]any{
+				"result": map[string]any{
+					"items": []any{
+						map[string]any{
+							"label": "TestVariable",
+							"kind":  float64(6),
+						},
+					},
+				},
+			},
+			expected: []CompletionItem{
+				{
+					Label: "TestVariable",
+					Kind:  CompletionItemKindVariable,
+				},
+			},
+		},
+		{
+			name: "empty completions response",
+			input: map[string]any{
+				"result": []any{},
+			},
+			expected: []CompletionItem{},
+		},
+		{
+			name: "missing result",
+			input: map[string]any{
+				"error": "some error",
+			},
+			expectedError: true,
+		},
+		{
+			name: "invalid result type",
+			input: map[string]any{
+				"result": "invalid",
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parseCompletionsFromResponse(tt.input)
+			if tt.expectedError {
+				if err == nil {
+					t.Errorf("parseCompletionsFromResponse() expected error but got none")
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("parseCompletionsFromResponse() error = %v", err)
+				return
+			}
+			if len(result) != len(tt.expected) {
+				t.Errorf("parseCompletionsFromResponse() count = %v, want %v", len(result), len(tt.expected))
+			}
+			for i, item := range result {
+				if i < len(tt.expected) && item.Label != tt.expected[i].Label {
+					t.Errorf("parseCompletionsFromResponse() item[%d].label = %v, want %v", i, item.Label, tt.expected[i].Label)
+				}
+			}
+		})
+	}
+}

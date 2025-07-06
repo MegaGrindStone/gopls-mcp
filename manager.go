@@ -760,6 +760,28 @@ type GoToTypeDefinitionParams struct {
 	Character int    `json:"character"`
 }
 
+// GetDiagnosticsParams represents parameters for get diagnostics requests.
+type GetDiagnosticsParams struct {
+	Workspace string `json:"workspace"`
+	URI       string `json:"uri"`
+}
+
+// FindImplementationsParams represents parameters for find implementations requests.
+type FindImplementationsParams struct {
+	Workspace string `json:"workspace"`
+	URI       string `json:"uri"`
+	Line      int    `json:"line"`
+	Character int    `json:"character"`
+}
+
+// GetCompletionsParams represents parameters for get completions requests.
+type GetCompletionsParams struct {
+	Workspace string `json:"workspace"`
+	URI       string `json:"uri"`
+	Line      int    `json:"line"`
+	Character int    `json:"character"`
+}
+
 // LocationResult represents a location result.
 type LocationResult struct {
 	URI          string `json:"uri"`
@@ -832,6 +854,46 @@ type SearchWorkspaceSymbolsResult struct {
 // GoToTypeDefinitionResult represents the result of a go to type definition request.
 type GoToTypeDefinitionResult struct {
 	Locations []LocationResult `json:"locations"`
+}
+
+// DiagnosticResult represents a diagnostic for MCP response.
+type DiagnosticResult struct {
+	Range    LocationResult `json:"range"`
+	Severity int            `json:"severity"`
+	Code     string         `json:"code,omitempty"`
+	Source   string         `json:"source,omitempty"`
+	Message  string         `json:"message"`
+	Tags     []int          `json:"tags,omitempty"`
+}
+
+// GetDiagnosticsResult represents the result of a get diagnostics request.
+type GetDiagnosticsResult struct {
+	Diagnostics []DiagnosticResult `json:"diagnostics"`
+}
+
+// FindImplementationsResult represents the result of a find implementations request.
+type FindImplementationsResult struct {
+	Locations []LocationResult `json:"locations"`
+}
+
+// CompletionItemResult represents a completion item for MCP response.
+type CompletionItemResult struct {
+	Label            string `json:"label"`
+	Kind             int    `json:"kind"`
+	Tags             []int  `json:"tags,omitempty"`
+	Detail           string `json:"detail,omitempty"`
+	Documentation    string `json:"documentation,omitempty"`
+	Deprecated       bool   `json:"deprecated,omitempty"`
+	Preselect        bool   `json:"preselect,omitempty"`
+	SortText         string `json:"sortText,omitempty"`
+	FilterText       string `json:"filterText,omitempty"`
+	InsertText       string `json:"insertText,omitempty"`
+	InsertTextFormat int    `json:"insertTextFormat,omitempty"`
+}
+
+// GetCompletionsResult represents the result of a get completions request.
+type GetCompletionsResult struct {
+	Items []CompletionItemResult `json:"items"`
 }
 
 // MCP tool handlers
@@ -1159,6 +1221,137 @@ func (wm *WorkspaceManager) HandleGoToTypeDefinition(
 	}, nil
 }
 
+// HandleGetDiagnostics handles get diagnostics requests for WorkspaceManager.
+func (wm *WorkspaceManager) HandleGetDiagnostics(
+	ctx context.Context,
+	_ *mcp.ServerSession,
+	params *mcp.CallToolParamsFor[GetDiagnosticsParams],
+) (*mcp.CallToolResultFor[GetDiagnosticsResult], error) {
+	// Get the appropriate manager for the workspace
+	manager, err := wm.GetManager(params.Arguments.Workspace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get manager for workspace: %w", err)
+	}
+
+	if !manager.IsRunning() {
+		return nil, fmt.Errorf("gopls is not running for workspace: %s", params.Arguments.Workspace)
+	}
+
+	diagnostics, err := manager.GetDiagnostics(ctx, params.Arguments.URI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get diagnostics: %w", err)
+	}
+
+	result := GetDiagnosticsResult{
+		Diagnostics: convertDiagnosticsToMCP(diagnostics, params.Arguments.URI),
+	}
+
+	jsonData, err := json.Marshal(result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal result: %w", err)
+	}
+
+	return &mcp.CallToolResultFor[GetDiagnosticsResult]{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: string(jsonData),
+			},
+		},
+	}, nil
+}
+
+// HandleFindImplementations handles find implementations requests for WorkspaceManager.
+//
+//nolint:dupl // MCP handlers follow similar patterns but call different LSP methods
+func (wm *WorkspaceManager) HandleFindImplementations(
+	ctx context.Context,
+	_ *mcp.ServerSession,
+	params *mcp.CallToolParamsFor[FindImplementationsParams],
+) (*mcp.CallToolResultFor[FindImplementationsResult], error) {
+	// Get the appropriate manager for the workspace
+	manager, err := wm.GetManager(params.Arguments.Workspace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get manager for workspace: %w", err)
+	}
+
+	if !manager.IsRunning() {
+		return nil, fmt.Errorf("gopls is not running for workspace: %s", params.Arguments.Workspace)
+	}
+
+	locations, err := manager.FindImplementations(
+		ctx, params.Arguments.URI, params.Arguments.Line, params.Arguments.Character)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find implementations: %w", err)
+	}
+
+	result := FindImplementationsResult{
+		Locations: make([]LocationResult, len(locations)),
+	}
+
+	for i, loc := range locations {
+		result.Locations[i] = LocationResult{
+			URI:          loc.URI,
+			Line:         loc.Range.Start.Line,
+			Character:    loc.Range.Start.Character,
+			EndLine:      loc.Range.End.Line,
+			EndCharacter: loc.Range.End.Character,
+		}
+	}
+
+	jsonData, err := json.Marshal(result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal result: %w", err)
+	}
+
+	return &mcp.CallToolResultFor[FindImplementationsResult]{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: string(jsonData),
+			},
+		},
+	}, nil
+}
+
+// HandleGetCompletions handles get completions requests for WorkspaceManager.
+func (wm *WorkspaceManager) HandleGetCompletions(
+	ctx context.Context,
+	_ *mcp.ServerSession,
+	params *mcp.CallToolParamsFor[GetCompletionsParams],
+) (*mcp.CallToolResultFor[GetCompletionsResult], error) {
+	// Get the appropriate manager for the workspace
+	manager, err := wm.GetManager(params.Arguments.Workspace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get manager for workspace: %w", err)
+	}
+
+	if !manager.IsRunning() {
+		return nil, fmt.Errorf("gopls is not running for workspace: %s", params.Arguments.Workspace)
+	}
+
+	completions, err := manager.GetCompletions(
+		ctx, params.Arguments.URI, params.Arguments.Line, params.Arguments.Character)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get completions: %w", err)
+	}
+
+	result := GetCompletionsResult{
+		Items: convertCompletionsToMCP(completions),
+	}
+
+	jsonData, err := json.Marshal(result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal result: %w", err)
+	}
+
+	return &mcp.CallToolResultFor[GetCompletionsResult]{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: string(jsonData),
+			},
+		},
+	}, nil
+}
+
 // Helper functions to convert LSP types to MCP result types
 
 // convertDocumentSymbolToMCP converts a DocumentSymbol to DocumentSymbolResult.
@@ -1224,6 +1417,68 @@ func convertWorkspaceSymbolsToMCP(symbols []SymbolInformation) []WorkspaceSymbol
 	var results []WorkspaceSymbolResult
 	for _, symbol := range symbols {
 		results = append(results, convertWorkspaceSymbolToMCP(symbol))
+	}
+	return results
+}
+
+// convertDiagnosticToMCP converts a Diagnostic to DiagnosticResult.
+func convertDiagnosticToMCP(diagnostic Diagnostic, uri string) DiagnosticResult {
+	return DiagnosticResult{
+		Range: LocationResult{
+			URI:          uri,
+			Line:         diagnostic.Range.Start.Line,
+			Character:    diagnostic.Range.Start.Character,
+			EndLine:      diagnostic.Range.End.Line,
+			EndCharacter: diagnostic.Range.End.Character,
+		},
+		Severity: int(diagnostic.Severity),
+		Code:     diagnostic.Code,
+		Source:   diagnostic.Source,
+		Message:  diagnostic.Message,
+		Tags:     convertDiagnosticTagsToMCP(diagnostic.Tags),
+	}
+}
+
+// convertDiagnosticsToMCP converts a slice of Diagnostic to DiagnosticResult.
+func convertDiagnosticsToMCP(diagnostics []Diagnostic, uri string) []DiagnosticResult {
+	var results []DiagnosticResult
+	for _, diagnostic := range diagnostics {
+		results = append(results, convertDiagnosticToMCP(diagnostic, uri))
+	}
+	return results
+}
+
+// convertDiagnosticTagsToMCP converts DiagnosticTag slice to int slice.
+func convertDiagnosticTagsToMCP(tags []DiagnosticTag) []int {
+	var result []int
+	for _, tag := range tags {
+		result = append(result, int(tag))
+	}
+	return result
+}
+
+// convertCompletionItemToMCP converts a CompletionItem to CompletionItemResult.
+func convertCompletionItemToMCP(item CompletionItem) CompletionItemResult {
+	return CompletionItemResult{
+		Label:            item.Label,
+		Kind:             int(item.Kind),
+		Tags:             item.Tags,
+		Detail:           item.Detail,
+		Documentation:    item.Documentation,
+		Deprecated:       item.Deprecated,
+		Preselect:        item.Preselect,
+		SortText:         item.SortText,
+		FilterText:       item.FilterText,
+		InsertText:       item.InsertText,
+		InsertTextFormat: item.InsertTextFormat,
+	}
+}
+
+// convertCompletionsToMCP converts a slice of CompletionItem to CompletionItemResult.
+func convertCompletionsToMCP(items []CompletionItem) []CompletionItemResult {
+	var results []CompletionItemResult
+	for _, item := range items {
+		results = append(results, convertCompletionItemToMCP(item))
 	}
 	return results
 }
@@ -1320,6 +1575,49 @@ func (wm *WorkspaceManager) CreateGoToTypeDefinitionTool() *mcp.ServerTool {
 		"go_to_type_definition",
 		"Navigate to the type definition of a symbol at the specified position in a Go file",
 		wm.HandleGoToTypeDefinition,
+		mcp.Input(
+			mcp.Property("workspace", mcp.Description("Workspace path"), mcp.Required(true)),
+			mcp.Property("uri", mcp.Description("File URI (e.g., file:///path/to/file.go)"), mcp.Required(true)),
+			mcp.Property("line", mcp.Description("Line number (0-based)"), mcp.Required(true)),
+			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
+		),
+	)
+}
+
+// CreateGetDiagnosticsTool creates the get diagnostics MCP tool for WorkspaceManager.
+func (wm *WorkspaceManager) CreateGetDiagnosticsTool() *mcp.ServerTool {
+	return mcp.NewServerTool[GetDiagnosticsParams, GetDiagnosticsResult](
+		"get_diagnostics",
+		"Retrieve compile errors, warnings, and static analysis results for a Go file",
+		wm.HandleGetDiagnostics,
+		mcp.Input(
+			mcp.Property("workspace", mcp.Description("Workspace path"), mcp.Required(true)),
+			mcp.Property("uri", mcp.Description("File URI (e.g., file:///path/to/file.go)"), mcp.Required(true)),
+		),
+	)
+}
+
+// CreateFindImplementationsTool creates the find implementations MCP tool for WorkspaceManager.
+func (wm *WorkspaceManager) CreateFindImplementationsTool() *mcp.ServerTool {
+	return mcp.NewServerTool[FindImplementationsParams, FindImplementationsResult](
+		"find_implementations",
+		"Find concrete implementations of interfaces at the specified position in a Go file",
+		wm.HandleFindImplementations,
+		mcp.Input(
+			mcp.Property("workspace", mcp.Description("Workspace path"), mcp.Required(true)),
+			mcp.Property("uri", mcp.Description("File URI (e.g., file:///path/to/file.go)"), mcp.Required(true)),
+			mcp.Property("line", mcp.Description("Line number (0-based)"), mcp.Required(true)),
+			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
+		),
+	)
+}
+
+// CreateGetCompletionsTool creates the get completions MCP tool for WorkspaceManager.
+func (wm *WorkspaceManager) CreateGetCompletionsTool() *mcp.ServerTool {
+	return mcp.NewServerTool[GetCompletionsParams, GetCompletionsResult](
+		"get_completions",
+		"Provide code completion suggestions at the specified position in a Go file",
+		wm.HandleGetCompletions,
 		mcp.Input(
 			mcp.Property("workspace", mcp.Description("Workspace path"), mcp.Required(true)),
 			mcp.Property("uri", mcp.Description("File URI (e.g., file:///path/to/file.go)"), mcp.Required(true)),
