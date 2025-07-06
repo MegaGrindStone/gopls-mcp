@@ -169,77 +169,115 @@ func TestManagerLSPMethodsWhenNotRunning(t *testing.T) {
 	}
 }
 
-func TestManagerMCPToolHandlersWhenNotRunning(t *testing.T) {
+func TestWorkspaceManagerMCPToolHandlersWhenNotRunning(t *testing.T) {
 	logger := newTestLogger()
-	manager := NewManager("/test/workspace", logger)
+	workspaces := []string{"/test/workspace1", "/test/workspace2"}
+	workspaceManager := NewWorkspaceManager(workspaces, logger)
 	ctx := context.Background()
 
 	// Test HandleGoToDefinition when not running
 	params := &mcp.CallToolParamsFor[GoToDefinitionParams]{
 		Arguments: GoToDefinitionParams{
+			Workspace: "/test/workspace1",
 			URI:       "file:///test.go",
 			Line:      10,
 			Character: 5,
 		},
 	}
-	_, err := manager.HandleGoToDefinition(ctx, nil, params)
+	_, err := workspaceManager.HandleGoToDefinition(ctx, nil, params)
 	if err == nil {
-		t.Error("HandleGoToDefinition() on non-running manager should return error")
+		t.Error("HandleGoToDefinition() on non-running workspace manager should return error")
 	}
 
 	// Test HandleFindReferences when not running
 	refParams := &mcp.CallToolParamsFor[FindReferencesParams]{
 		Arguments: FindReferencesParams{
+			Workspace:          "/test/workspace1",
 			URI:                "file:///test.go",
 			Line:               10,
 			Character:          5,
 			IncludeDeclaration: true,
 		},
 	}
-	_, err = manager.HandleFindReferences(ctx, nil, refParams)
+	_, err = workspaceManager.HandleFindReferences(ctx, nil, refParams)
 	if err == nil {
-		t.Error("HandleFindReferences() on non-running manager should return error")
+		t.Error("HandleFindReferences() on non-running workspace manager should return error")
 	}
 
 	// Test HandleGetHover when not running
 	hoverParams := &mcp.CallToolParamsFor[GetHoverParams]{
 		Arguments: GetHoverParams{
+			Workspace: "/test/workspace1",
 			URI:       "file:///test.go",
 			Line:      10,
 			Character: 5,
 		},
 	}
-	_, err = manager.HandleGetHover(ctx, nil, hoverParams)
+	_, err = workspaceManager.HandleGetHover(ctx, nil, hoverParams)
 	if err == nil {
-		t.Error("HandleGetHover() on non-running manager should return error")
+		t.Error("HandleGetHover() on non-running workspace manager should return error")
+	}
+
+	// Test HandleListWorkspaces
+	listParams := &mcp.CallToolParamsFor[ListWorkspacesParams]{
+		Arguments: ListWorkspacesParams{},
+	}
+	result, err := workspaceManager.HandleListWorkspaces(ctx, nil, listParams)
+	if err != nil {
+		t.Errorf("HandleListWorkspaces() returned error: %v", err)
+	}
+	if result == nil {
+		t.Error("HandleListWorkspaces() returned nil result")
+	}
+
+	// Test with nonexistent workspace
+	badParams := &mcp.CallToolParamsFor[GoToDefinitionParams]{
+		Arguments: GoToDefinitionParams{
+			Workspace: "/nonexistent/workspace",
+			URI:       "file:///test.go",
+			Line:      10,
+			Character: 5,
+		},
+	}
+	_, err = workspaceManager.HandleGoToDefinition(ctx, nil, badParams)
+	if err == nil {
+		t.Error("HandleGoToDefinition() with nonexistent workspace should return error")
 	}
 }
 
-func TestManagerCreateTools(t *testing.T) {
+func TestWorkspaceManagerCreateTools(t *testing.T) {
 	logger := newTestLogger()
-	manager := NewManager("/test/workspace", logger)
+	workspaces := []string{"/test/workspace1", "/test/workspace2"}
+	workspaceManager := NewWorkspaceManager(workspaces, logger)
 
 	// Test CreateGoToDefinitionTool
-	tool := manager.CreateGoToDefinitionTool()
+	tool := workspaceManager.CreateGoToDefinitionTool()
 	if tool == nil {
 		t.Error("CreateGoToDefinitionTool() returned nil")
 	}
 
 	// Test CreateFindReferencesTool
-	tool = manager.CreateFindReferencesTool()
+	tool = workspaceManager.CreateFindReferencesTool()
 	if tool == nil {
 		t.Error("CreateFindReferencesTool() returned nil")
 	}
 
 	// Test CreateGetHoverTool
-	tool = manager.CreateGetHoverTool()
+	tool = workspaceManager.CreateGetHoverTool()
 	if tool == nil {
 		t.Error("CreateGetHoverTool() returned nil")
+	}
+
+	// Test CreateListWorkspacesTool
+	tool = workspaceManager.CreateListWorkspacesTool()
+	if tool == nil {
+		t.Error("CreateListWorkspacesTool() returned nil")
 	}
 }
 
 func TestGoToDefinitionParams(t *testing.T) {
 	params := GoToDefinitionParams{
+		Workspace: "/test/workspace",
 		URI:       "file:///test.go",
 		Line:      10,
 		Character: 5,
@@ -265,6 +303,7 @@ func TestGoToDefinitionParams(t *testing.T) {
 
 func TestFindReferencesParams(t *testing.T) {
 	params := FindReferencesParams{
+		Workspace:          "/test/workspace",
 		URI:                "file:///test.go",
 		Line:               10,
 		Character:          5,
@@ -291,6 +330,7 @@ func TestFindReferencesParams(t *testing.T) {
 
 func TestGetHoverParams(t *testing.T) {
 	params := GetHoverParams{
+		Workspace: "/test/workspace",
 		URI:       "file:///test.go",
 		Line:      10,
 		Character: 5,

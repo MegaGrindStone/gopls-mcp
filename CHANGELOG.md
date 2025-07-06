@@ -9,11 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Multi-Workspace Support**: Complete multi-workspace architecture allowing multiple Go projects in a single server instance
+- **WorkspaceManager Component**: New component to coordinate multiple Manager instances with dedicated gopls processes per workspace
+- **New MCP Tool**: `list_workspaces` tool to display all available workspaces and their running status
+- **Workspace Routing**: Intelligent request routing based on workspace parameter in MCP tool calls
+- **Enhanced Docker Support**: Multi-workspace Docker deployment with multiple volume mount examples
+- **Comprehensive Multi-Workspace Testing**: 47 tests covering single workspace, multiple workspaces, and workspace management scenarios
+
 ### Changed
 
-### Fixed
+- **BREAKING**: Replaced `-workspace` flag with `-workspaces` flag accepting comma-separated workspace paths
+- **BREAKING**: All MCP tools now require mandatory `workspace` parameter for workspace routing:
+  - `go_to_definition` requires `workspace` field
+  - `find_references` requires `workspace` field  
+  - `get_hover_info` requires `workspace` field
+- **BREAKING**: No backward compatibility - old single-workspace usage patterns no longer supported
+- Updated Dockerfile CMD to use `-workspaces` flag instead of `-workspace`
+- Enhanced documentation with multi-workspace usage examples and Docker deployment patterns
+- Updated command-line help and flag descriptions for multi-workspace usage
 
 ### Removed
+
+- **BREAKING**: Removed `-workspace` flag (replaced by `-workspaces`)
+- **BREAKING**: Removed automatic workspace discovery - explicit workspace specification now required
 
 ## [v0.2.1] - 2025-07-05
 

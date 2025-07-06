@@ -4,72 +4,90 @@ import (
 	"flag"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-func TestWorkspacePathValidation(t *testing.T) {
+func TestWorkspacesPathValidation(t *testing.T) {
 	// Save original command line arguments
 	origArgs := os.Args
 	defer func() {
 		os.Args = origArgs
 	}()
 
-	// Test case 1: Missing workspace path
+	// Test case 1: Missing workspaces path
 	os.Args = []string{"gopls-mcp"}
 
 	// Reset flag for testing
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
-	workspacePath := flag.String("workspace", "", "Path to the Go workspace directory (required)")
+	workspacesFlag := flag.String("workspaces", "", "Comma-separated list of workspace paths (required)")
 	flag.Parse()
 
-	if *workspacePath != "" {
-		t.Errorf("Expected empty workspace path, got %s", *workspacePath)
+	if *workspacesFlag != "" {
+		t.Errorf("Expected empty workspaces path, got %s", *workspacesFlag)
 	}
 
-	// Test case 2: Valid workspace path
-	os.Args = []string{"gopls-mcp", "-workspace", "/test/workspace"}
+	// Test case 2: Valid single workspace path
+	os.Args = []string{"gopls-mcp", "-workspaces", "/test/workspace"}
 
 	// Reset flag for testing
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
-	workspacePath = flag.String("workspace", "", "Path to the Go workspace directory (required)")
+	workspacesFlag = flag.String("workspaces", "", "Comma-separated list of workspace paths (required)")
 	flag.Parse()
 
 	expectedPath := "/test/workspace"
-	if *workspacePath != expectedPath {
-		t.Errorf("Expected workspace path %s, got %s", expectedPath, *workspacePath)
+	if *workspacesFlag != expectedPath {
+		t.Errorf("Expected workspaces path %s, got %s", expectedPath, *workspacesFlag)
 	}
 }
 
-func TestWorkspacePathParsing(t *testing.T) {
+func TestWorkspacesPathParsing(t *testing.T) {
 	tests := []struct {
-		name     string
-		args     []string
-		expected string
+		name           string
+		args           []string
+		expectedFlag   string
+		expectedParsed []string
 	}{
 		{
-			name:     "valid workspace path",
-			args:     []string{"gopls-mcp", "-workspace", "/test/workspace"},
-			expected: "/test/workspace",
+			name:           "valid single workspace path",
+			args:           []string{"gopls-mcp", "-workspaces", "/test/workspace"},
+			expectedFlag:   "/test/workspace",
+			expectedParsed: []string{"/test/workspace"},
 		},
 		{
-			name:     "empty workspace path",
-			args:     []string{"gopls-mcp"},
-			expected: "",
+			name:           "valid multiple workspace paths",
+			args:           []string{"gopls-mcp", "-workspaces", "/test/workspace1,/test/workspace2"},
+			expectedFlag:   "/test/workspace1,/test/workspace2",
+			expectedParsed: []string{"/test/workspace1", "/test/workspace2"},
 		},
 		{
-			name:     "workspace path with equals",
-			args:     []string{"gopls-mcp", "-workspace=/test/workspace"},
-			expected: "/test/workspace",
+			name:           "empty workspaces path",
+			args:           []string{"gopls-mcp"},
+			expectedFlag:   "",
+			expectedParsed: []string{""},
 		},
 		{
-			name:     "workspace path with spaces",
-			args:     []string{"gopls-mcp", "-workspace", "/test/workspace with spaces"},
-			expected: "/test/workspace with spaces",
+			name:           "workspaces path with equals",
+			args:           []string{"gopls-mcp", "-workspaces=/test/workspace"},
+			expectedFlag:   "/test/workspace",
+			expectedParsed: []string{"/test/workspace"},
+		},
+		{
+			name:           "workspaces path with spaces",
+			args:           []string{"gopls-mcp", "-workspaces", "/test/workspace with spaces"},
+			expectedFlag:   "/test/workspace with spaces",
+			expectedParsed: []string{"/test/workspace with spaces"},
+		},
+		{
+			name:           "multiple workspaces with spaces",
+			args:           []string{"gopls-mcp", "-workspaces", "/test/workspace1, /test/workspace2 ,/test/workspace3"},
+			expectedFlag:   "/test/workspace1, /test/workspace2 ,/test/workspace3",
+			expectedParsed: []string{"/test/workspace1", "/test/workspace2", "/test/workspace3"},
 		},
 	}
 
@@ -88,45 +106,94 @@ func TestWorkspacePathParsing(t *testing.T) {
 			flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
 			// Parse flags
-			workspacePath := flag.String("workspace", "", "Path to the Go workspace directory (required)")
+			workspacesFlag := flag.String("workspaces", "", "Comma-separated list of workspace paths (required)")
 			flag.Parse()
 
-			if *workspacePath != tt.expected {
-				t.Errorf("Expected workspace path %s, got %s", tt.expected, *workspacePath)
+			if *workspacesFlag != tt.expectedFlag {
+				t.Errorf("Expected workspaces flag %s, got %s", tt.expectedFlag, *workspacesFlag)
+			}
+
+			// Test parsing logic
+			if *workspacesFlag != "" {
+				workspacePaths := strings.Split(*workspacesFlag, ",")
+				for i, path := range workspacePaths {
+					workspacePaths[i] = strings.TrimSpace(path)
+				}
+
+				if len(workspacePaths) != len(tt.expectedParsed) {
+					t.Errorf("Expected %d workspaces, got %d", len(tt.expectedParsed), len(workspacePaths))
+				}
+
+				for i, expected := range tt.expectedParsed {
+					if i < len(workspacePaths) && workspacePaths[i] != expected {
+						t.Errorf("Expected workspace %d to be %s, got %s", i, expected, workspacePaths[i])
+					}
+				}
 			}
 		})
 	}
 }
 
-func TestManagerCreation(t *testing.T) {
-	workspacePath := "/test/workspace"
+func TestWorkspaceManagerCreation(t *testing.T) {
+	workspacePaths := []string{"/test/workspace1", "/test/workspace2"}
 	logger := newTestLogger()
-	manager := NewManager(workspacePath, logger)
+	workspaceManager := NewWorkspaceManager(workspacePaths, logger)
 
-	if manager == nil {
-		t.Fatal("Expected non-nil manager")
+	if workspaceManager == nil {
+		t.Fatal("Expected non-nil workspace manager")
 	}
 
-	if manager.workspacePath != workspacePath {
-		t.Errorf("Expected workspace path %s, got %s", workspacePath, manager.workspacePath)
+	// Test that all workspaces are created
+	for _, workspace := range workspacePaths {
+		manager, err := workspaceManager.GetManager(workspace)
+		if err != nil {
+			t.Errorf("Expected to find manager for workspace %s, got error: %v", workspace, err)
+		}
+		if manager == nil {
+			t.Errorf("Expected non-nil manager for workspace %s", workspace)
+		}
+		if manager.IsRunning() {
+			t.Errorf("Expected manager for workspace %s to not be running initially", workspace)
+		}
 	}
 
-	if manager.IsRunning() {
-		t.Error("Expected manager to not be running initially")
+	// Test GetWorkspaces
+	workspaces := workspaceManager.GetWorkspaces()
+	if len(workspaces) != len(workspacePaths) {
+		t.Errorf("Expected %d workspaces, got %d", len(workspacePaths), len(workspaces))
+	}
+
+	// Test GetWorkspaceStatus
+	status := workspaceManager.GetWorkspaceStatus()
+	if len(status) != len(workspacePaths) {
+		t.Errorf("Expected %d workspace statuses, got %d", len(workspacePaths), len(status))
+	}
+	for workspace := range status {
+		found := false
+		for _, expectedWorkspace := range workspacePaths {
+			if workspace == expectedWorkspace {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Unexpected workspace in status: %s", workspace)
+		}
 	}
 }
 
 func TestServerComponentCreation(t *testing.T) {
 	// Test that we can create the basic components without errors
-	workspacePath := "/test/workspace"
+	workspacePaths := []string{"/test/workspace"}
 	logger := newTestLogger()
-	manager := NewManager(workspacePath, logger)
+	workspaceManager := NewWorkspaceManager(workspacePaths, logger)
 
 	// Test tool creation
 	tools := []*mcp.ServerTool{
-		manager.CreateGoToDefinitionTool(),
-		manager.CreateFindReferencesTool(),
-		manager.CreateGetHoverTool(),
+		workspaceManager.CreateGoToDefinitionTool(),
+		workspaceManager.CreateFindReferencesTool(),
+		workspaceManager.CreateGetHoverTool(),
+		workspaceManager.CreateListWorkspacesTool(),
 	}
 
 	for i, tool := range tools {
@@ -221,22 +288,22 @@ func TestTransportFlagParsing(t *testing.T) {
 	}{
 		{
 			name:     "default transport (http)",
-			args:     []string{"gopls-mcp", "-workspace", "/test"},
+			args:     []string{"gopls-mcp", "-workspaces", "/test"},
 			expected: "http",
 		},
 		{
 			name:     "explicit http transport",
-			args:     []string{"gopls-mcp", "-workspace", "/test", "-transport", "http"},
+			args:     []string{"gopls-mcp", "-workspaces", "/test", "-transport", "http"},
 			expected: "http",
 		},
 		{
 			name:     "stdio transport",
-			args:     []string{"gopls-mcp", "-workspace", "/test", "-transport", "stdio"},
+			args:     []string{"gopls-mcp", "-workspaces", "/test", "-transport", "stdio"},
 			expected: "stdio",
 		},
 		{
 			name:     "transport with equals",
-			args:     []string{"gopls-mcp", "-workspace", "/test", "-transport=stdio"},
+			args:     []string{"gopls-mcp", "-workspaces", "/test", "-transport=stdio"},
 			expected: "stdio",
 		},
 	}
@@ -256,7 +323,7 @@ func TestTransportFlagParsing(t *testing.T) {
 			flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
 			// Parse flags
-			workspacePath := flag.String("workspace", "", "Path to the Go workspace directory (required)")
+			workspacesFlag := flag.String("workspaces", "", "Comma-separated list of workspace paths (required)")
 			transportType := flag.String("transport", "http", "Transport type: http or stdio")
 			flag.Parse()
 
@@ -264,9 +331,9 @@ func TestTransportFlagParsing(t *testing.T) {
 				t.Errorf("Expected transport type %s, got %s", tt.expected, *transportType)
 			}
 
-			// Ensure workspace is still parsed correctly
-			if *workspacePath != "/test" {
-				t.Errorf("Expected workspace path /test, got %s", *workspacePath)
+			// Ensure workspaces is still parsed correctly
+			if *workspacesFlag != "/test" {
+				t.Errorf("Expected workspaces flag /test, got %s", *workspacesFlag)
 			}
 		})
 	}
@@ -316,13 +383,13 @@ func TestTransportValidation(t *testing.T) {
 }
 
 func TestSetupMCPServer(t *testing.T) {
-	// Create a test manager
-	workspacePath := "/test/workspace"
+	// Create a test workspace manager
+	workspacePaths := []string{"/test/workspace"}
 	logger := newTestLogger()
-	manager := NewManager(workspacePath, logger)
+	workspaceManager := NewWorkspaceManager(workspacePaths, logger)
 
 	// Test server setup
-	server := setupMCPServer(manager)
+	server := setupMCPServer(workspaceManager)
 
 	if server == nil {
 		t.Fatal("Expected non-nil MCP server")
@@ -331,4 +398,104 @@ func TestSetupMCPServer(t *testing.T) {
 	// The server should be properly configured with tools
 	// (We can't test the tools directly without starting gopls,
 	// but we can verify the server is created)
+}
+
+// TestMultiWorkspaceScenarios tests various multi-workspace scenarios.
+func TestMultiWorkspaceScenarios(t *testing.T) {
+	tests := []struct {
+		name       string
+		workspaces []string
+		testFunc   func(t *testing.T, wm *WorkspaceManager)
+	}{
+		{
+			name:       "single workspace",
+			workspaces: []string{"/test/workspace1"},
+			testFunc: func(t *testing.T, wm *WorkspaceManager) {
+				workspaces := wm.GetWorkspaces()
+				if len(workspaces) != 1 {
+					t.Errorf("Expected 1 workspace, got %d", len(workspaces))
+				}
+				if workspaces[0] != "/test/workspace1" {
+					t.Errorf("Expected workspace /test/workspace1, got %s", workspaces[0])
+				}
+			},
+		},
+		{
+			name:       "multiple workspaces",
+			workspaces: []string{"/test/workspace1", "/test/workspace2", "/test/workspace3"},
+			testFunc: func(t *testing.T, wm *WorkspaceManager) {
+				workspaces := wm.GetWorkspaces()
+				if len(workspaces) != 3 {
+					t.Errorf("Expected 3 workspaces, got %d", len(workspaces))
+				}
+
+				expectedWorkspaces := map[string]bool{
+					"/test/workspace1": true,
+					"/test/workspace2": true,
+					"/test/workspace3": true,
+				}
+
+				for _, workspace := range workspaces {
+					if !expectedWorkspaces[workspace] {
+						t.Errorf("Unexpected workspace: %s", workspace)
+					}
+				}
+			},
+		},
+		{
+			name:       "workspace manager not found",
+			workspaces: []string{"/test/workspace1"},
+			testFunc: func(t *testing.T, wm *WorkspaceManager) {
+				_, err := wm.GetManager("/nonexistent/workspace")
+				if err == nil {
+					t.Error("Expected error for nonexistent workspace, got nil")
+				}
+				expectedError := "workspace not found: /nonexistent/workspace"
+				if err.Error() != expectedError {
+					t.Errorf("Expected error %s, got %s", expectedError, err.Error())
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger := newTestLogger()
+			workspaceManager := NewWorkspaceManager(tt.workspaces, logger)
+
+			if workspaceManager == nil {
+				t.Fatal("Expected non-nil workspace manager")
+			}
+
+			tt.testFunc(t, workspaceManager)
+		})
+	}
+}
+
+// TestWorkspaceManagerToolCreation tests that all tools are created properly for WorkspaceManager.
+func TestWorkspaceManagerToolCreation(t *testing.T) {
+	workspaces := []string{"/test/workspace1", "/test/workspace2"}
+	logger := newTestLogger()
+	wm := NewWorkspaceManager(workspaces, logger)
+
+	tools := map[string]*mcp.ServerTool{
+		"go_to_definition": wm.CreateGoToDefinitionTool(),
+		"find_references":  wm.CreateFindReferencesTool(),
+		"get_hover_info":   wm.CreateGetHoverTool(),
+		"list_workspaces":  wm.CreateListWorkspacesTool(),
+	}
+
+	for name, tool := range tools {
+		if tool == nil {
+			t.Errorf("Tool %s is nil", name)
+		}
+	}
+
+	// Test that we can add all tools to an MCP server
+	server := mcp.NewServer("test-server", "v0.1.0", nil)
+	toolSlice := make([]*mcp.ServerTool, 0, len(tools))
+	for _, tool := range tools {
+		toolSlice = append(toolSlice, tool)
+	}
+	server.AddTools(toolSlice...)
 }

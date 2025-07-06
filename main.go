@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -24,14 +25,36 @@ func main() {
 	slog.SetDefault(logger)
 
 	// Parse command line flags
-	workspacePath := flag.String("workspace", "", "Path to the Go workspace directory (required)")
+	workspacesFlag := flag.String("workspaces", "", "Comma-separated list of workspace paths (required)")
 	transportType := flag.String("transport", "http", "Transport type: http or stdio")
 	flag.Parse()
 
-	// Validate that workspace path is provided
-	if *workspacePath == "" {
-		logger.Error("workspace flag is required")
+	// Validate that workspaces are provided
+	if *workspacesFlag == "" {
+		logger.Error("workspaces flag is required")
 		os.Exit(1)
+	}
+
+	// Parse workspaces from comma-separated string
+	workspacePaths := strings.Split(*workspacesFlag, ",")
+
+	// Trim whitespace from each workspace path
+	for i, path := range workspacePaths {
+		workspacePaths[i] = strings.TrimSpace(path)
+	}
+
+	// Validate that we have at least one workspace
+	if len(workspacePaths) == 0 {
+		logger.Error("at least one workspace path is required")
+		os.Exit(1)
+	}
+
+	// Validate that all workspace paths are non-empty
+	for _, path := range workspacePaths {
+		if path == "" {
+			logger.Error("workspace path cannot be empty")
+			os.Exit(1)
+		}
 	}
 
 	// Validate transport type
@@ -40,21 +63,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Create gopls manager
-	goplsManager := NewManager(*workspacePath, logger)
+	// Create workspace manager
+	workspaceManager := NewWorkspaceManager(workspacePaths, logger)
 
-	// Start gopls
+	// Start all workspaces
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	if err := goplsManager.Start(ctx); err != nil {
-		logger.Error("failed to start gopls", "error", err)
+	if err := workspaceManager.Start(ctx); err != nil {
+		logger.Error("failed to start workspaces", "error", err)
 		return
 	}
-	defer func() { _ = goplsManager.Stop() }()
+	defer func() { _ = workspaceManager.Stop() }()
 
 	// Create and setup MCP server
-	server := setupMCPServer(goplsManager)
+	server := setupMCPServer(workspaceManager)
 
 	// Handle graceful shutdown
 	go func() {
@@ -63,12 +86,12 @@ func main() {
 		<-sigChan
 		logger.Info("shutting down server")
 		cancel()
-		_ = goplsManager.Stop()
+		_ = workspaceManager.Stop()
 		os.Exit(0)
 	}()
 
 	logger.Info("starting gopls-mcp server",
-		"workspace", *workspacePath,
+		"workspaces", workspacePaths,
 		"transport", *transportType)
 
 	// Start server based on transport type
@@ -100,15 +123,16 @@ func main() {
 }
 
 // setupMCPServer creates and configures the MCP server with gopls tools.
-func setupMCPServer(goplsManager *Manager) *mcp.Server {
+func setupMCPServer(workspaceManager *WorkspaceManager) *mcp.Server {
 	// Create MCP server
 	server := mcp.NewServer("gopls-mcp", "v0.1.0", nil)
 
-	// Add gopls tools
+	// Add gopls tools (these will be updated to handle multiple workspaces)
 	server.AddTools(
-		goplsManager.CreateGoToDefinitionTool(),
-		goplsManager.CreateFindReferencesTool(),
-		goplsManager.CreateGetHoverTool(),
+		workspaceManager.CreateGoToDefinitionTool(),
+		workspaceManager.CreateFindReferencesTool(),
+		workspaceManager.CreateGetHoverTool(),
+		workspaceManager.CreateListWorkspacesTool(),
 	)
 
 	return server
