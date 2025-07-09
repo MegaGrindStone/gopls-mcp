@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Major Architecture Refactor**: Restructured codebase for better separation of concerns and maintainability
+  - **Removed Files**: `lsp.go`, `lsp_test.go`, `manager.go`, `manager_test.go`, `test_helpers.go` (~1,994 lines)
+  - **Added Files**: `client.go` (857 lines), `client_integration_test.go`, `mcp.go` (268 lines)
+  - **Improved Separation**: Split monolithic `manager.go` into focused `client.go` (LSP client) and `mcp.go` (MCP tools)
+  - **Enhanced Testing**: Replaced unit tests with comprehensive integration tests for real-world validation
+  - **Cleaner API**: MCP tools now use workspace-relative paths instead of URIs for simplified usage
+  - **Better Documentation**: Updated `CLAUDE.md` with comprehensive architecture and testing details
+
 ### Fixed
 
 ### Removed

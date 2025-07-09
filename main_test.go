@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"log/slog"
 	"net/http"
 	"os"
 	"testing"
@@ -44,7 +45,6 @@ func TestWorkspacePathValidation(t *testing.T) {
 		t.Errorf("Expected workspace path %s, got %s", expectedPath, *workspacePath)
 	}
 }
-
 func TestWorkspacePathParsing(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -98,35 +98,38 @@ func TestWorkspacePathParsing(t *testing.T) {
 	}
 }
 
-func TestManagerCreation(t *testing.T) {
+func TestClientCreation(t *testing.T) {
 	workspacePath := "/test/workspace"
 	logger := newTestLogger()
-	manager := NewManager(workspacePath, logger)
+	client := newClient(workspacePath, logger)
 
-	if manager == nil {
-		t.Fatal("Expected non-nil manager")
+	if client == nil {
+		t.Fatal("Expected non-nil client")
 	}
 
-	if manager.workspacePath != workspacePath {
-		t.Errorf("Expected workspace path %s, got %s", workspacePath, manager.workspacePath)
+	if client.workspacePath != workspacePath {
+		t.Errorf("Expected workspace path %s, got %s", workspacePath, client.workspacePath)
 	}
 
-	if manager.IsRunning() {
-		t.Error("Expected manager to not be running initially")
+	if client.isRunning() {
+		t.Error("Expected client to not be running initially")
 	}
 }
 
-func TestServerComponentCreation(t *testing.T) {
+func TestMCPToolsCreation(t *testing.T) {
 	// Test that we can create the basic components without errors
 	workspacePath := "/test/workspace"
 	logger := newTestLogger()
-	manager := NewManager(workspacePath, logger)
+	client := newClient(workspacePath, logger)
+
+	// Create mcpTools wrapper
+	mcpToolsWrapper := newMCPTools(client)
 
 	// Test tool creation
 	tools := []*mcp.ServerTool{
-		manager.CreateGoToDefinitionTool(),
-		manager.CreateFindReferencesTool(),
-		manager.CreateGetHoverTool(),
+		mcpToolsWrapper.CreateGoToDefinitionTool(),
+		mcpToolsWrapper.CreateFindReferencesTool(),
+		mcpToolsWrapper.CreateGetHoverTool(),
 	}
 
 	for i, tool := range tools {
@@ -144,7 +147,6 @@ func TestServerComponentCreation(t *testing.T) {
 	// Test adding tools to server
 	server.AddTools(tools...)
 }
-
 func TestMCPServerCreation(t *testing.T) {
 	server := mcp.NewServer("gopls-mcp", "v0.1.0", nil)
 	if server == nil {
@@ -160,7 +162,6 @@ func TestMCPServerCreation(t *testing.T) {
 		t.Error("Expected non-nil streamable HTTP handler")
 	}
 }
-
 func TestHTTPServerConfiguration(t *testing.T) {
 	// Test HTTP server configuration values
 	expectedAddr := ":8080"
@@ -191,7 +192,6 @@ func TestHTTPServerConfiguration(t *testing.T) {
 		t.Errorf("Expected idle timeout %v, got %v", expectedIdleTimeout, httpServer.IdleTimeout)
 	}
 }
-
 func TestHTTPMuxSetup(t *testing.T) {
 	// Test HTTP mux setup
 	mux := http.NewServeMux()
@@ -212,7 +212,6 @@ func TestHTTPMuxSetup(t *testing.T) {
 		t.Error("Mux should not be nil after adding handler")
 	}
 }
-
 func TestTransportFlagParsing(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -271,7 +270,6 @@ func TestTransportFlagParsing(t *testing.T) {
 		})
 	}
 }
-
 func TestTransportValidation(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -316,13 +314,13 @@ func TestTransportValidation(t *testing.T) {
 }
 
 func TestSetupMCPServer(t *testing.T) {
-	// Create a test manager
+	// Create a test client
 	workspacePath := "/test/workspace"
 	logger := newTestLogger()
-	manager := NewManager(workspacePath, logger)
+	client := newClient(workspacePath, logger)
 
 	// Test server setup
-	server := setupMCPServer(manager)
+	server := setupMCPServer(client)
 
 	if server == nil {
 		t.Fatal("Expected non-nil MCP server")
@@ -331,4 +329,14 @@ func TestSetupMCPServer(t *testing.T) {
 	// The server should be properly configured with tools
 	// (We can't test the tools directly without starting gopls,
 	// but we can verify the server is created)
+}
+
+// newTestLogger creates a logger suitable for testing.
+func newTestLogger() *slog.Logger {
+	// Use a simple text handler with ERROR level for testing to reduce noise
+	opts := &slog.HandlerOptions{
+		Level: slog.LevelError,
+	}
+	handler := slog.NewTextHandler(os.Stdout, opts)
+	return slog.New(handler)
 }

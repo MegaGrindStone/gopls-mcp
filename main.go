@@ -40,21 +40,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Create gopls manager
-	goplsManager := NewManager(*workspacePath, logger)
+	// Create gopls client
+	goplsClient := newClient(*workspacePath, logger)
 
 	// Start gopls
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	if err := goplsManager.Start(ctx); err != nil {
+	if err := goplsClient.start(ctx); err != nil {
 		logger.Error("failed to start gopls", "error", err)
 		return
 	}
-	defer func() { _ = goplsManager.Stop() }()
+	defer func() { _ = goplsClient.stop() }()
 
 	// Create and setup MCP server
-	server := setupMCPServer(goplsManager)
+	server := setupMCPServer(goplsClient)
 
 	// Handle graceful shutdown
 	go func() {
@@ -63,7 +63,7 @@ func main() {
 		<-sigChan
 		logger.Info("shutting down server")
 		cancel()
-		_ = goplsManager.Stop()
+		_ = goplsClient.stop()
 		os.Exit(0)
 	}()
 
@@ -97,19 +97,4 @@ func main() {
 			logger.Error("HTTP server failed to start", "error", err)
 		}
 	}
-}
-
-// setupMCPServer creates and configures the MCP server with gopls tools.
-func setupMCPServer(goplsManager *Manager) *mcp.Server {
-	// Create MCP server
-	server := mcp.NewServer("gopls-mcp", "v0.1.0", nil)
-
-	// Add gopls tools
-	server.AddTools(
-		goplsManager.CreateGoToDefinitionTool(),
-		goplsManager.CreateFindReferencesTool(),
-		goplsManager.CreateGetHoverTool(),
-	)
-
-	return server
 }

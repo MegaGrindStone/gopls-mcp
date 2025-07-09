@@ -6,6 +6,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a Go project for implementing a Model Context Protocol (MCP) server for gopls (Go language server). The server supports both HTTP and stdio transports to provide Go language server capabilities to MCP clients like Claude.
 
+## 🚨 MANDATORY Go Coding Guidelines
+
+**CRITICAL**: ALL Go coding patterns from `~/.claude/CLAUDE.md` are equally mandatory for this project - no exceptions.
+
+### Key Reminder
+
+This project requires strict adherence to ALL guidelines including:
+
+- Early return patterns (reduce nesting)
+- Use `any` instead of `interface{}`
+- Start with unexported identifiers by default
+- Prefer non-pointer structs when passing to/from functions  
+- Follow Go naming conventions (avoid stuttering)
+- AND ALL OTHER patterns in the global guidelines
+
+**📖 Complete Guidelines**: See `~/.claude/CLAUDE.md` for full Go development guidelines.
+
 ## Development Commands
 
 ### Standard Go Commands
@@ -89,26 +106,74 @@ gh release delete v1.0.0
 ### Key Components
 
 - **main.go**: Multi-transport server setup with HTTP and stdio transport support and MCP server initialization
-- **manager.go**: gopls process management, LSP client, and MCP tool handlers
-- **lsp.go**: LSP protocol types and gopls communication methods
+- **client.go**: Complete gopls LSP client with lifecycle management and core LSP operations
+- **mcp.go**: MCP (Model Context Protocol) tools and handlers integrated with goplsClient
 - **logger.go**: Structured logging initialization with slog and environment variable configuration
-- **test_helpers.go**: Testing utilities including reduced-verbosity logger for tests
 - **Dockerfile**: Multi-stage Docker build with gopls installation and security hardening
 - **.dockerignore**: Docker context optimization for faster builds
 - **.github/workflows/release.yaml**: Release-triggered CI/CD pipeline with quality gates and automated Docker publishing
 - **.golangci.yaml**: Comprehensive linting configuration for code quality
 
-### Test Files
+## Testing
 
-- **lsp_test.go**: Tests LSP protocol parsing functions, response handling, and error cases
-- **manager_test.go**: Tests Manager lifecycle, thread safety, MCP tool handlers, and JSON marshaling
+### Testing Strategy
+
+The project uses Go's standard testing package with comprehensive tests:
+
+- **client_integration_test.go**: Comprehensive integration tests for goplsClient (goToDefinition, findReferences, getHover)
 - **main_test.go**: Tests application layer components like argument parsing and HTTP server setup
+
+### Test Coverage
+
+- **LSP Client Layer**: Complete gopls integration testing with real workspace scenarios
+- **MCP Integration**: All MCP tools tested through the gopls client interface
+- **Application Layer**: Command-line parsing, HTTP server setup, and component creation
+
+### Running Tests
+
+```bash
+# Run all tests with verbose output and no caching (recommended)
+go test ./... -v -count=1 -p 1
+
+# Run tests with coverage
+go test ./... -cover
+
+# Run specific test file
+go test -v client_integration_test.go
+```
 
 ### Available MCP Tools
 
 1. **go_to_definition**: Navigate to symbol definitions
 2. **find_references**: Find all references to a symbol
 3. **get_hover_info**: Get documentation and type information
+
+### MCP Architecture (mcp.go)
+
+The MCP layer is cleanly separated in `mcp.go` and follows Go best practices:
+
+**Architecture Pattern:**
+
+- **`mcpTools` struct**: Wraps `goplsClient` for MCP functionality
+- **Value receivers**: All methods use `(m mcpTools)` following Go guidelines for small structs
+- **Direct path handling**: Accepts workspace-relative paths directly for simplicity
+- **Error handling**: Proper error propagation and context
+
+**Key Components:**
+
+- **Parameter types**: `GoToDefinitionParams`, `FindReferencesParams`, `GetHoverParams`
+- **Result types**: `GoToDefinitionResult`, `FindReferencesResult`, `GetHoverResult`
+- **Handler methods**: `HandleGoToDefinition`, `HandleFindReferences`, `HandleGetHover`
+- **Tool creators**: `CreateGoToDefinitionTool`, `CreateFindReferencesTool`, `CreateGetHoverTool`
+- **Setup function**: `setupMCPServer` for main.go integration
+
+**Go Best Practices Followed:**
+
+- **Non-pointer structs**: Returns `mcpTools` value, not `*mcpTools` pointer
+- **Value receivers**: No unnecessary pointer passing for small structs
+- **Early returns**: Proper error handling with early returns
+- **Simple path handling**: Direct workspace-relative path processing
+- **Consistent naming**: Follows Go naming conventions
 
 ## Usage Examples
 
@@ -161,7 +226,7 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
 {
   "name": "go_to_definition",
   "arguments": {
-    "uri": "file:///path/to/file.go",
+    "path": "main.go",
     "line": 10,
     "character": 5
   }
@@ -174,7 +239,7 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
 {
   "name": "find_references",
   "arguments": {
-    "uri": "file:///path/to/file.go",
+    "path": "pkg/client.go",
     "line": 10,
     "character": 5,
     "includeDeclaration": true
@@ -188,7 +253,7 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
 {
   "name": "get_hover_info",
   "arguments": {
-    "uri": "file:///path/to/file.go",
+    "path": "mcp.go",
     "line": 10,
     "character": 5
   }
@@ -308,38 +373,6 @@ This project implements a Model Context Protocol server that interfaces with gop
 2. **gopls Integration**: Subprocess management with LSP communication
 3. **MCP Tools**: Structured tools for Go language server features
 4. **Graceful Shutdown**: Proper cleanup of gopls processes
-
-## Testing
-
-### Testing Strategy
-
-The project uses Go's standard testing package with comprehensive unit tests covering all major functionality:
-
-- **Unit Tests Only**: No integration tests to avoid external dependencies
-- **Table-Driven Tests**: Multiple test cases with edge cases and error conditions
-- **Thread Safety**: Concurrent testing for Manager request ID generation
-- **Error Handling**: Comprehensive testing of error conditions and invalid inputs
-- **JSON Marshaling**: Validation of MCP parameter and result serialization
-
-### Test Coverage
-
-- **LSP Protocol Layer**: Response parsing, type conversion, and error handling
-- **Manager Component**: Lifecycle management, tool handlers, and thread safety
-- **Application Layer**: Command-line parsing, HTTP server setup, and component creation
-- **31 Total Tests**: All major functions and methods tested with success/error paths including transport functionality
-
-### Running Tests
-
-```bash
-# Run all tests with verbose output and no caching (recommended)
-go test ./... -v -count=1 -p 1
-
-# Run tests with coverage
-go test ./... -cover
-
-# Run specific test file
-go test -v lsp_test.go
-```
 
 ## Development Guidelines
 
