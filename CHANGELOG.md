@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Workspace Recognition Issue**: Fixed "No active builds contain /workspace/*/main.go" error by adding missing `workspaceFolders` parameter to LSP initialize request
+  - **Root Cause**: LSP initialize request declared `"workspaceFolders": true` capability but didn't provide actual workspace folders for gopls to track
+  - **Solution**: Added `workspaceFolders` parameter with proper workspace URI and name mapping to LSP initialize request in `client.go:173-178`
+  - **Impact**: Resolves workspace recognition issues in both local and containerized environments (Docker/Kubernetes)
+  - **Testing**: All 70 tests pass without workspace recognition errors, confirmed working across single and multi-workspace configurations
+
 ### Removed
 
 ## [v0.3.0] - 2025-07-10

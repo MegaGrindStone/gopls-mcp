@@ -170,6 +170,12 @@ func (c *goplsClient) initialize() error {
 		"params": map[string]any{
 			"processId": os.Getpid(),
 			"rootUri":   fmt.Sprintf("file://%s", c.workspacePath),
+			"workspaceFolders": []map[string]any{
+				{
+					"uri":  fmt.Sprintf("file://%s", c.workspacePath),
+					"name": filepath.Base(c.workspacePath),
+				},
+			},
 			"capabilities": map[string]any{
 				"textDocument": map[string]any{
 					"hover": map[string]any{
