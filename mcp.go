@@ -324,6 +324,8 @@ func (m mcpTools) convertLocationToResult(location Location) LocationResult {
 }
 
 // convertDocumentSymbolToResult converts a DocumentSymbol struct to DocumentSymbolResult struct.
+//
+//nolint:dupl // Intentional duplication with test version for isolation
 func (m mcpTools) convertDocumentSymbolToResult(symbol DocumentSymbol) DocumentSymbolResult {
 	children := make([]DocumentSymbolResult, len(symbol.Children))
 	for i, child := range symbol.Children {

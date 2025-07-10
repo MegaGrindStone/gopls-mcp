@@ -125,6 +125,13 @@ The LSP client functionality has been refactored into 8 focused, single-responsi
 - **completion.go** (265 lines): Code assistance tools (getSignatureHelp, getCompletions, parameter information)
 - **formatting.go** (317 lines): Code maintenance tools (formatDocument, organizeImports, getInlayHints, text edits)
 
+#### Test Files
+
+- **mcp_test.go** (687 lines): Comprehensive mock-based unit tests for MCP layer with interface abstraction and type conversion testing
+- **mcp_integration_test.go** (421 lines): End-to-end integration tests for MCP tools with real gopls instances and multi-workspace testing
+- **client_integration_test.go** (1622 lines): LSP client layer integration tests for gopls communication and workspace management
+- **main_test.go** (345 lines): Application layer tests for command-line parsing, HTTP server setup, and component creation
+
 #### Infrastructure Files
 
 - **Dockerfile**: Multi-stage Docker build with gopls installation and security hardening
@@ -162,15 +169,44 @@ The LSP client functionality has been refactored into 8 focused, single-responsi
 
 ### Testing Strategy
 
-The project uses Go's standard testing package with comprehensive tests:
+The project uses Go's standard testing package with comprehensive multi-layer testing:
 
-- **client_integration_test.go**: Comprehensive integration tests for goplsClient (goToDefinition, findReferences, getHover)
-- **main_test.go**: Tests application layer components like argument parsing and HTTP server setup
+#### **MCP Layer Testing**
+
+- **mcp_test.go**: Mock-based unit tests for MCP layer with interface abstraction (`goplsClientInterface`)
+- **mcp_integration_test.go**: End-to-end integration tests with real gopls instances for all 14 MCP tools
+
+#### **LSP Client Layer Testing**  
+
+- **client_integration_test.go**: Comprehensive integration tests for goplsClient communication and workspace management
+
+#### **Application Layer Testing**
+
+- **main_test.go**: Command-line parsing, HTTP server setup, and component creation
+
+### Test Architecture Patterns
+
+#### **Mock Interface Pattern** (`mcp_test.go`)
+
+- **Interface Abstraction**: `goplsClientInterface` defines testable contract for LSP operations
+- **Test Isolation**: `testMCPTools` wrapper isolates MCP logic from LSP implementation details
+- **Method Tracking**: Mock clients track method calls for verification
+- **Error Injection**: Configurable error responses for comprehensive error handling tests
+
+#### **Integration Test Patterns** (`mcp_integration_test.go`)
+
+- **Real gopls Integration**: Tests with actual gopls processes for authentic behavior
+- **Multi-Workspace Testing**: Validates workspace routing and client management
+- **JSON Response Parsing**: Helper functions for MCP response validation
+- **Common Test Fixtures**: Reusable workspace creation and cleanup utilities
 
 ### Test Coverage
 
+- **MCP Layer**: Complete coverage of all 14 MCP tools with unit and integration tests
+- **Multi-Workspace Support**: Full testing of workspace routing and client management  
+- **Type Conversions**: Comprehensive testing of LSP↔MCP data structure conversions
+- **Error Handling**: Extensive error scenario coverage and validation
 - **LSP Client Layer**: Complete gopls integration testing with real workspace scenarios
-- **MCP Integration**: All MCP tools tested through the gopls client interface
 - **Application Layer**: Command-line parsing, HTTP server setup, and component creation
 
 ### Running Tests
@@ -182,8 +218,11 @@ go test ./... -v -count=1 -p 1
 # Run tests with coverage
 go test ./... -cover
 
-# Run specific test file
-go test -v client_integration_test.go
+# Run specific test layers
+go test -run "Test.*MCP" ./...              # MCP layer tests only
+go test -run "TestGoplsClient" ./...        # LSP client tests only  
+go test -v mcp_test.go                      # MCP unit tests only
+go test -v mcp_integration_test.go          # MCP integration tests only
 ```
 
 ### Available MCP Tools
@@ -637,6 +676,24 @@ This project implements a Model Context Protocol server that interfaces with gop
 - Add appropriate logging for debugging MCP interactions
 - Write tests for new functionality using the established patterns
 - Run tests and linter before committing changes
+
+### Testing Guidelines
+
+**Follow Established Testing Patterns**:
+
+- **MCP Layer**: Use mock interface pattern (`goplsClientInterface`) for unit tests and real gopls integration for end-to-end tests
+- **Interface Abstraction**: Create testable interfaces for external dependencies (gopls client)
+- **Test Isolation**: Use wrapper structs (`testMCPTools`) to isolate logic under test
+- **Error Scenarios**: Include comprehensive error injection and validation tests
+- **JSON Validation**: Test MCP response parsing and structure validation
+- **Multi-Workspace**: Include workspace routing tests for new MCP functionality
+
+**Test Organization**:
+
+- **Unit Tests**: Fast, isolated tests with mocks for individual components
+- **Integration Tests**: Real gopls integration for authentic behavior validation
+- **Common Utilities**: Extract reusable test helpers (workspace creation, parsing, etc.)
+- **Clear Naming**: Use descriptive test names that explain the scenario being tested
 
 ### Modular Architecture Guidelines
 
