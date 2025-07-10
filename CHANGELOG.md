@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Docker "No active builds" Error**: Fixed gopls module analysis failure in Docker containers by including full Go toolchain
+  - **Root Cause**: Docker runtime stage was missing Go toolchain required for gopls internal `go list` operations
+  - **Solution**: Simplified Dockerfile to single-stage build using `golang:1.24.4-alpine` base image
+  - **Impact**: Enables full gopls functionality in Docker environments with proper workspace module analysis
+  - **Architecture**: Eliminated redundant multi-stage build pattern for cleaner, more efficient Docker builds
+  - **Testing**: Verified with MCP tools returning actual Go diagnostics instead of "No active builds" errors
+
 ## [v0.3.1] - 2025-07-10
 
 ### Fixed

@@ -73,6 +73,7 @@ func (c *goplsClient) start(ctx context.Context) error {
 
 	// Start gopls process
 	c.cmd = exec.CommandContext(ctx, "gopls")
+	c.cmd.Dir = c.workspacePath
 
 	c.stdin, err = c.cmd.StdinPipe()
 	if err != nil {

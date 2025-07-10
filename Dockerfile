@@ -1,10 +1,10 @@
-# Build stage
-FROM golang:1.24.4-alpine AS builder
+# Single-stage build using golang:1.24.4-alpine
+FROM golang:1.24.4-alpine
 
-# Install build dependencies
-RUN apk add --no-cache git ca-certificates
+# Install dependencies
+RUN apk add --no-cache ca-certificates git
 
-# Set working directory
+# Set working directory for build
 WORKDIR /app
 
 # Copy go mod files
@@ -19,41 +19,27 @@ COPY . .
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o gopls-mcp .
 
-# Install gopls in builder stage
+# Install gopls
 RUN go install golang.org/x/tools/gopls@latest
-
-# Runtime stage
-FROM alpine:latest AS runtime
-
-# Install runtime dependencies
-RUN apk add --no-cache ca-certificates git
 
 # Create non-root user
 RUN addgroup -g 1001 -S gopls && \
     adduser -S gopls -u 1001 -G gopls
 
-# Set working directory
+# Set working directory for runtime
 WORKDIR /workspace
 
-# Copy binary from builder stage
-COPY --from=builder /app/gopls-mcp /usr/local/bin/gopls-mcp
-
-# Copy gopls binary from builder stage
-COPY --from=builder /go/bin/gopls /usr/local/bin/gopls
+# Copy binary to standard location
+RUN cp /app/gopls-mcp /usr/local/bin/gopls-mcp
 
 # Change ownership of the binaries
-RUN chown gopls:gopls /usr/local/bin/gopls-mcp /usr/local/bin/gopls
+RUN chown gopls:gopls /usr/local/bin/gopls-mcp /go/bin/gopls
 
 # Switch to non-root user
 USER gopls
 
 # Expose port
 EXPOSE 8080
-
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8080 || exit 1
 
 # Set entrypoint
 ENTRYPOINT ["/usr/local/bin/gopls-mcp"]
