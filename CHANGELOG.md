@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Diagnostic Timing Bug**: Fixed inconsistent diagnostic results on first call to `get_diagnostics` by preventing premature acceptance of empty diagnostics
+  - **Root Cause**: The stability mechanism was accepting empty diagnostics as "stable" after 200ms, but gopls takes ~2 seconds to complete analysis
+  - **Solution**: Added `minWaitForNonEmpty = 3 * time.Second` constant to prevent accepting empty diagnostics within first 3 seconds
+  - **Impact**: All `get_diagnostics` calls now consistently return complete diagnostics (14 for `mcp.go`)
+  - **Files Modified**: `diagnostic.go:109` (constant), `diagnostic.go:135-138` (early rejection logic)
+  - **Testing**: Verified with multiple consecutive calls returning 14 diagnostics consistently instead of 0 on first call
 - **Docker "No active builds" Error**: Fixed gopls module analysis failure in Docker containers by including full Go toolchain
   - **Root Cause**: Docker runtime stage was missing Go toolchain required for gopls internal `go list` operations
   - **Solution**: Simplified Dockerfile to single-stage build using `golang:1.24.4-alpine` base image

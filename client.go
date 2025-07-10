@@ -18,32 +18,34 @@ import (
 
 // goplsClient manages a gopls subprocess and handles basic LSP communication.
 type goplsClient struct {
-	cmd            *exec.Cmd
-	stdin          io.WriteCloser
-	stdout         io.ReadCloser
-	stderr         io.ReadCloser
-	workspacePath  string
-	mu             sync.RWMutex
-	running        bool
-	logger         *slog.Logger
-	requestID      int
-	requestIDMux   sync.Mutex
-	responses      map[int]chan map[string]any
-	responsesMux   sync.Mutex
-	openFiles      map[string]bool
-	openFilesMux   sync.RWMutex
-	diagnostics    map[string][]Diagnostic
-	diagnosticsMux sync.RWMutex
+	cmd                   *exec.Cmd
+	stdin                 io.WriteCloser
+	stdout                io.ReadCloser
+	stderr                io.ReadCloser
+	workspacePath         string
+	mu                    sync.RWMutex
+	running               bool
+	logger                *slog.Logger
+	requestID             int
+	requestIDMux          sync.Mutex
+	responses             map[int]chan map[string]any
+	responsesMux          sync.Mutex
+	openFiles             map[string]bool
+	openFilesMux          sync.RWMutex
+	diagnostics           map[string][]Diagnostic
+	diagnosticsMux        sync.RWMutex
+	diagnosticsTimestamps map[string]time.Time
 }
 
 // newClient creates a new gopls client with the specified workspace path.
 func newClient(workspacePath string, logger *slog.Logger) *goplsClient {
 	c := &goplsClient{
-		workspacePath: workspacePath,
-		logger:        logger,
-		responses:     make(map[int]chan map[string]any),
-		openFiles:     make(map[string]bool),
-		diagnostics:   make(map[string][]Diagnostic),
+		workspacePath:         workspacePath,
+		logger:                logger,
+		responses:             make(map[int]chan map[string]any),
+		openFiles:             make(map[string]bool),
+		diagnostics:           make(map[string][]Diagnostic),
+		diagnosticsTimestamps: make(map[string]time.Time),
 	}
 	c.logger.Debug("created new gopls client", "workspacePath", workspacePath)
 	return c
