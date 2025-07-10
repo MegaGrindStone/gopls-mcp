@@ -228,6 +228,12 @@ The MCP server will automatically use the appropriate tool based on your request
   - Single workspace: `-workspace /path/to/project`
   - Multiple workspaces: `-workspace /project1,/project2,/project3`
   - Supports spaces in paths: `-workspace "/path with spaces/project1,/project2"`
+  
+  **⚠️ Memory Usage Notice**: Each workspace uses approximately **300MB of RAM** as it runs a dedicated gopls process. When using multiple workspaces, plan accordingly:
+  - 1 workspace: ~300MB RAM
+  - 5 workspaces: ~1.5GB RAM
+  - 10 workspaces: ~3GB RAM
+  
 - **`-transport`** (optional): Transport type, accepts 'http' or 'stdio' (defaults to 'http')
 - **Port**: Fixed at 8080 (Streamable HTTP transport only)
 
