@@ -16,74 +16,24 @@ import (
 	"time"
 )
 
-const (
-	fileScheme = "file"
-)
-
-// LSP types for gopls communication
-
-// Position represents a position in a document.
-type Position struct {
-	Line      int `json:"line"`
-	Character int `json:"character"`
-}
-
-// Range represents a range in a document.
-type Range struct {
-	Start Position `json:"start"`
-	End   Position `json:"end"`
-}
-
-// Location represents a location in a document.
-type Location struct {
-	URI   string `json:"uri"`
-	Range Range  `json:"range"`
-}
-
-// TextDocumentIdentifier identifies a text document.
-type TextDocumentIdentifier struct {
-	URI string `json:"uri"`
-}
-
-// TextDocumentPositionParams represents parameters for text document position requests.
-type TextDocumentPositionParams struct {
-	TextDocument TextDocumentIdentifier `json:"textDocument"`
-	Position     Position               `json:"position"`
-}
-
-// ReferenceParams represents parameters for find references requests.
-type ReferenceParams struct {
-	TextDocumentPositionParams
-	Context ReferenceContext `json:"context"`
-}
-
-// ReferenceContext represents context for find references requests.
-type ReferenceContext struct {
-	IncludeDeclaration bool `json:"includeDeclaration"`
-}
-
-// Hover represents hover information.
-type Hover struct {
-	Contents []string `json:"contents"`
-	Range    *Range   `json:"range,omitempty"`
-}
-
 // goplsClient manages a gopls subprocess and handles basic LSP communication.
 type goplsClient struct {
-	cmd           *exec.Cmd
-	stdin         io.WriteCloser
-	stdout        io.ReadCloser
-	stderr        io.ReadCloser
-	workspacePath string
-	mu            sync.RWMutex
-	running       bool
-	logger        *slog.Logger
-	requestID     int
-	requestIDMux  sync.Mutex
-	responses     map[int]chan map[string]any
-	responsesMux  sync.Mutex
-	openFiles     map[string]bool
-	openFilesMux  sync.RWMutex
+	cmd            *exec.Cmd
+	stdin          io.WriteCloser
+	stdout         io.ReadCloser
+	stderr         io.ReadCloser
+	workspacePath  string
+	mu             sync.RWMutex
+	running        bool
+	logger         *slog.Logger
+	requestID      int
+	requestIDMux   sync.Mutex
+	responses      map[int]chan map[string]any
+	responsesMux   sync.Mutex
+	openFiles      map[string]bool
+	openFilesMux   sync.RWMutex
+	diagnostics    map[string][]Diagnostic
+	diagnosticsMux sync.RWMutex
 }
 
 // newClient creates a new gopls client with the specified workspace path.
@@ -93,6 +43,7 @@ func newClient(workspacePath string, logger *slog.Logger) *goplsClient {
 		logger:        logger,
 		responses:     make(map[int]chan map[string]any),
 		openFiles:     make(map[string]bool),
+		diagnostics:   make(map[string][]Diagnostic),
 	}
 	c.logger.Debug("created new gopls client", "workspacePath", workspacePath)
 	return c
@@ -408,7 +359,16 @@ func (c *goplsClient) handleLSPMessage(message map[string]any) {
 		}
 	case hasMethod:
 		// This is a notification or request from server
-		c.logger.Debug("received notification/request from gopls", "method", method)
+		if methodStr, isString := method.(string); isString {
+			switch methodStr {
+			case "textDocument/publishDiagnostics":
+				c.handlePublishDiagnostics(message)
+			default:
+				c.logger.Debug("received notification/request from gopls", "method", method)
+			}
+		} else {
+			c.logger.Debug("received notification/request from gopls", "method", method)
+		}
 	default:
 		c.logger.Debug("unhandled LSP message", "message", message)
 	}
@@ -563,295 +523,4 @@ func (c *goplsClient) ensureFileOpen(relativePath string) error {
 
 	c.logger.Debug("opened file in gopls", "relativePath", relativePath, "uri", fileURI)
 	return nil
-}
-
-// goToDefinition sends a textDocument/definition request to gopls using relative paths.
-func (c *goplsClient) goToDefinition(relativePath string, line, character int) ([]Location, error) {
-	c.logger.Debug("goToDefinition called", "relativePath", relativePath, "line", line, "character", character)
-
-	if !c.isRunning() {
-		return nil, fmt.Errorf("gopls is not running")
-	}
-
-	// Ensure file is open in gopls
-	if err := c.ensureFileOpen(relativePath); err != nil {
-		return nil, fmt.Errorf("failed to open file: %w", err)
-	}
-
-	// Convert relative path to URI for LSP request
-	fileURI := c.relativePathToURI(relativePath)
-
-	// Create textDocument/definition request
-	request := map[string]any{
-		"jsonrpc": "2.0",
-		"id":      c.nextRequestID(),
-		"method":  "textDocument/definition",
-		"params": map[string]any{
-			"textDocument": map[string]any{
-				"uri": fileURI,
-			},
-			"position": map[string]any{
-				"line":      line,
-				"character": character,
-			},
-		},
-	}
-
-	// Send request and wait for response
-	response, err := c.sendRequestAndWait(request)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get definition: %w", err)
-	}
-
-	// Parse response to get locations
-	locations, err := c.parseLocationsFromResponse(response)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse locations: %w", err)
-	}
-
-	// Convert URIs back to relative paths
-	for i := range locations {
-		locations[i].URI = c.uriToRelativePath(locations[i].URI)
-	}
-
-	return locations, nil
-}
-
-// findReferences sends a textDocument/references request to gopls using relative paths.
-func (c *goplsClient) findReferences(
-	relativePath string, line, character int, includeDeclaration bool,
-) ([]Location, error) {
-	c.logger.Debug("findReferences called",
-		"relativePath", relativePath,
-		"line", line,
-		"character", character,
-		"includeDeclaration", includeDeclaration)
-
-	if !c.isRunning() {
-		return nil, fmt.Errorf("gopls is not running")
-	}
-
-	// Ensure file is open in gopls
-	if err := c.ensureFileOpen(relativePath); err != nil {
-		return nil, fmt.Errorf("failed to open file: %w", err)
-	}
-
-	// Convert relative path to URI for LSP request
-	fileURI := c.relativePathToURI(relativePath)
-
-	// Create textDocument/references request
-	request := map[string]any{
-		"jsonrpc": "2.0",
-		"id":      c.nextRequestID(),
-		"method":  "textDocument/references",
-		"params": ReferenceParams{
-			TextDocumentPositionParams: TextDocumentPositionParams{
-				TextDocument: TextDocumentIdentifier{URI: fileURI},
-				Position: Position{
-					Line:      line,
-					Character: character,
-				},
-			},
-			Context: ReferenceContext{
-				IncludeDeclaration: includeDeclaration,
-			},
-		},
-	}
-
-	// Send request and wait for response
-	response, err := c.sendRequestAndWait(request)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find references: %w", err)
-	}
-
-	// Parse response to get locations
-	locations, err := c.parseLocationsFromResponse(response)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse locations: %w", err)
-	}
-
-	// Convert URIs back to relative paths
-	for i := range locations {
-		locations[i].URI = c.uriToRelativePath(locations[i].URI)
-	}
-
-	return locations, nil
-}
-
-// getHover sends a textDocument/hover request to gopls using relative paths.
-func (c *goplsClient) getHover(relativePath string, line, character int) (*Hover, error) {
-	c.logger.Debug("getHover called", "relativePath", relativePath, "line", line, "character", character)
-
-	if !c.isRunning() {
-		return nil, fmt.Errorf("gopls is not running")
-	}
-
-	// Ensure file is open in gopls
-	if err := c.ensureFileOpen(relativePath); err != nil {
-		return nil, fmt.Errorf("failed to open file: %w", err)
-	}
-
-	// Convert relative path to URI for LSP request
-	fileURI := c.relativePathToURI(relativePath)
-
-	// Create textDocument/hover request
-	request := map[string]any{
-		"jsonrpc": "2.0",
-		"id":      c.nextRequestID(),
-		"method":  "textDocument/hover",
-		"params": map[string]any{
-			"textDocument": map[string]any{
-				"uri": fileURI,
-			},
-			"position": map[string]any{
-				"line":      line,
-				"character": character,
-			},
-		},
-	}
-
-	// Send request and wait for response
-	response, err := c.sendRequestAndWait(request)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get hover info: %w", err)
-	}
-
-	// Parse response to get hover info
-	hover, err := c.parseHoverFromResponse(response)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse hover info: %w", err)
-	}
-
-	return hover, nil
-}
-
-// parseLocationsFromResponse extracts locations from LSP response.
-func (c *goplsClient) parseLocationsFromResponse(response map[string]any) ([]Location, error) {
-	result, resultOk := response["result"]
-	if !resultOk {
-		return nil, fmt.Errorf("invalid response format")
-	}
-
-	locations, locationsOk := result.([]any)
-	if !locationsOk {
-		return nil, fmt.Errorf("invalid response format")
-	}
-
-	var locs []Location
-	for _, loc := range locations {
-		if locMap, locMapOk := loc.(map[string]any); locMapOk {
-			location := c.parseLocationFromMap(locMap)
-			locs = append(locs, location)
-		}
-	}
-	return locs, nil
-}
-
-// parseLocationFromMap parses a single location from a map.
-func (c *goplsClient) parseLocationFromMap(locMap map[string]any) Location {
-	var location Location
-	if locURI, uriOk := locMap["uri"].(string); uriOk {
-		location.URI = locURI
-	}
-	if rangeMap, rangeMapOk := locMap["range"].(map[string]any); rangeMapOk {
-		location.Range = c.parseRange(rangeMap)
-	}
-	return location
-}
-
-// parseRange parses a range from a map.
-func (c *goplsClient) parseRange(rangeMap map[string]any) Range {
-	var rng Range
-	if startMap, startMapOk := rangeMap["start"].(map[string]any); startMapOk {
-		if line, lineOk := startMap["line"].(float64); lineOk {
-			rng.Start.Line = int(line)
-		}
-		if char, charOk := startMap["character"].(float64); charOk {
-			rng.Start.Character = int(char)
-		}
-	}
-	if endMap, endMapOk := rangeMap["end"].(map[string]any); endMapOk {
-		if line, lineOk := endMap["line"].(float64); lineOk {
-			rng.End.Line = int(line)
-		}
-		if char, charOk := endMap["character"].(float64); charOk {
-			rng.End.Character = int(char)
-		}
-	}
-	return rng
-}
-
-// parseHoverContents parses hover contents from any type.
-func (c *goplsClient) parseHoverContents(contents any) []string {
-	var result []string
-
-	// Handle string directly
-	if contentStr, contentStrOk := contents.(string); contentStrOk {
-		result = append(result, contentStr)
-		return result
-	}
-
-	// Handle single MarkupContent object
-	if contentMap, contentMapOk := contents.(map[string]any); contentMapOk {
-		if _, kindOk := contentMap["kind"].(string); kindOk {
-			if value, valueOk := contentMap["value"].(string); valueOk {
-				result = append(result, value)
-			}
-		}
-		return result
-	}
-
-	// Handle array of contents
-	if contentList, contentListOk := contents.([]any); contentListOk {
-		for _, content := range contentList {
-			if contentStr, contentStrOk := content.(string); contentStrOk {
-				result = append(result, contentStr)
-				continue
-			}
-
-			contentMap, contentMapOk := content.(map[string]any)
-			if !contentMapOk {
-				continue
-			}
-
-			// Handle MarkupContent format
-			if _, kindOk := contentMap["kind"].(string); !kindOk {
-				continue
-			}
-
-			if value, valueOk := contentMap["value"].(string); valueOk {
-				result = append(result, value)
-			}
-		}
-	}
-
-	return result
-}
-
-// parseHoverFromResponse extracts hover information from LSP response.
-func (c *goplsClient) parseHoverFromResponse(response map[string]any) (*Hover, error) {
-	result, resultOk := response["result"]
-	if !resultOk {
-		return nil, fmt.Errorf("invalid hover response format")
-	}
-
-	// Handle null result (no hover info available)
-	if result == nil {
-		return &Hover{Contents: []string{}}, nil
-	}
-
-	hoverMap, hoverMapOk := result.(map[string]any)
-	if !hoverMapOk {
-		return nil, fmt.Errorf("invalid hover response format")
-	}
-
-	var hover Hover
-	if contents, contentsOk := hoverMap["contents"]; contentsOk {
-		hover.Contents = c.parseHoverContents(contents)
-	}
-	if rangeMap, rangeMapOk := hoverMap["range"].(map[string]any); rangeMapOk {
-		rng := c.parseRange(rangeMap)
-		hover.Range = &rng
-	}
-	return &hover, nil
 }

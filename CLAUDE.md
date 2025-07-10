@@ -96,23 +96,51 @@ gh release delete v1.0.0
 
 - **Module**: `github.com/MegaGrindStone/gopls-mcp`
 - **Go Version**: 1.24.4
-- **Current State**: Fully functional MCP server with gopls integration, Docker support, and CI/CD pipeline
-- **Purpose**: MCP server for gopls integration
+- **Current State**: Enhanced MCP server with comprehensive gopls integration, 13 powerful tools, Docker support, and CI/CD pipeline
+- **Purpose**: Full-featured MCP server for gopls integration with AI assistants
 - **Transport**: HTTP and stdio transports (MCP specification compliant)
 - **Dependencies**: `github.com/modelcontextprotocol/go-sdk`
 - **Deployment**: Docker Hub (`megagrindstone/gopls-mcp`) with multi-platform support
 - **CI/CD**: GitHub Actions with comprehensive quality gates and automated Docker builds
+- **Tools**: 13 comprehensive gopls tools covering navigation, diagnostics, code assistance, and maintenance
 
 ### Key Components
 
+#### Core Application Files
+
 - **main.go**: Multi-transport server setup with HTTP and stdio transport support and MCP server initialization
-- **client.go**: Complete gopls LSP client with lifecycle management and core LSP operations
 - **mcp.go**: MCP (Model Context Protocol) tools and handlers integrated with goplsClient
 - **logger.go**: Structured logging initialization with slog and environment variable configuration
+
+#### Modular LSP Client Architecture
+
+The LSP client functionality has been refactored into 8 focused, single-responsibility files:
+
+- **client.go** (526 lines): Core gopls client lifecycle management, LSP communication infrastructure, file management, and message routing
+- **types.go** (160 lines): All LSP data types, constants, and structures (Position, Range, Location, Diagnostic, etc.)
+- **parsing.go** (136 lines): Common parsing utilities for LSP responses (locations, ranges, hover content)
+- **diagnostic.go** (117 lines): Diagnostic handling, publishDiagnostics notifications, and diagnostic retrieval
+- **navigation.go** (277 lines): Navigation and reference tools (goToDefinition, findReferences, getHover, getTypeDefinition, findImplementations)
+- **symbols.go** (207 lines): Symbol discovery tools (getDocumentSymbols, getWorkspaceSymbols, symbol parsing)
+- **completion.go** (265 lines): Code assistance tools (getSignatureHelp, getCompletions, parameter information)
+- **formatting.go** (317 lines): Code maintenance tools (formatDocument, organizeImports, getInlayHints, text edits)
+
+#### Infrastructure Files
+
 - **Dockerfile**: Multi-stage Docker build with gopls installation and security hardening
 - **.dockerignore**: Docker context optimization for faster builds
 - **.github/workflows/release.yaml**: Release-triggered CI/CD pipeline with quality gates and automated Docker publishing
 - **.golangci.yaml**: Comprehensive linting configuration for code quality
+
+#### Architectural Patterns
+
+**Separation of Concerns**: Each file focuses on a specific domain of LSP functionality, making the codebase more maintainable and easier to navigate.
+
+**Shared Client Instance**: All LSP functionality operates through methods on the central `goplsClient` struct, ensuring consistent state management and communication patterns.
+
+**Domain-Driven Organization**: Files are organized by functional domains (navigation, diagnostics, completion, etc.) rather than technical layers, improving discoverability.
+
+**Consistent Error Handling**: All LSP methods follow the same error handling patterns with proper context and early returns.
 
 ## Testing
 
@@ -144,9 +172,33 @@ go test -v client_integration_test.go
 
 ### Available MCP Tools
 
+#### Core Navigation Tools
+
 1. **go_to_definition**: Navigate to symbol definitions
 2. **find_references**: Find all references to a symbol
 3. **get_hover_info**: Get documentation and type information
+
+#### Diagnostic and Analysis Tools
+
+4. **get_diagnostics**: Get compilation errors, warnings, and diagnostics for a Go file
+5. **get_document_symbols**: Get outline of symbols (functions, types, etc.) defined in a Go file
+6. **get_workspace_symbols**: Search for symbols across the entire Go workspace/project
+
+#### Code Assistance Tools
+
+7. **get_signature_help**: Get function signature help (parameter information) at the specified position
+8. **get_completions**: Get code completion suggestions at the specified position
+
+#### Advanced Navigation Tools
+
+9. **get_type_definition**: Navigate to the type definition of a symbol at the specified position
+10. **find_implementations**: Find all implementations of an interface or method at the specified position
+
+#### Code Maintenance Tools
+
+11. **format_document**: Format a Go source file according to gofmt standards
+12. **organize_imports**: Organize and clean up import statements in a Go file
+13. **get_inlay_hints**: Get inlay hints (implicit parameter names, type information) for a range in a Go file
 
 ### MCP Architecture (mcp.go)
 
@@ -220,7 +272,9 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
 
 ### MCP Tool Examples
 
-#### Go to Definition
+#### Core Navigation Tools
+
+##### Go to Definition
 
 ```json
 {
@@ -233,7 +287,7 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
 }
 ```
 
-#### Find References
+##### Find References
 
 ```json
 {
@@ -247,7 +301,7 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
 }
 ```
 
-#### Get Hover Information
+##### Get Hover Information
 
 ```json
 {
@@ -256,6 +310,136 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
     "path": "mcp.go",
     "line": 10,
     "character": 5
+  }
+}
+```
+
+#### Diagnostic and Analysis Tools
+
+##### Get Diagnostics
+
+```json
+{
+  "name": "get_diagnostics",
+  "arguments": {
+    "path": "main.go"
+  }
+}
+```
+
+##### Get Document Symbols
+
+```json
+{
+  "name": "get_document_symbols",
+  "arguments": {
+    "path": "client.go"
+  }
+}
+```
+
+##### Get Workspace Symbols
+
+```json
+{
+  "name": "get_workspace_symbols",
+  "arguments": {
+    "query": "Client"
+  }
+}
+```
+
+#### Code Assistance Tools
+
+##### Get Signature Help
+
+```json
+{
+  "name": "get_signature_help",
+  "arguments": {
+    "path": "main.go",
+    "line": 15,
+    "character": 20
+  }
+}
+```
+
+##### Get Completions
+
+```json
+{
+  "name": "get_completions",
+  "arguments": {
+    "path": "main.go",
+    "line": 8,
+    "character": 5
+  }
+}
+```
+
+#### Advanced Navigation Tools
+
+##### Get Type Definition
+
+```json
+{
+  "name": "get_type_definition",
+  "arguments": {
+    "path": "client.go",
+    "line": 25,
+    "character": 10
+  }
+}
+```
+
+##### Find Implementations
+
+```json
+{
+  "name": "find_implementations",
+  "arguments": {
+    "path": "interfaces.go",
+    "line": 12,
+    "character": 8
+  }
+}
+```
+
+#### Code Maintenance Tools
+
+##### Format Document
+
+```json
+{
+  "name": "format_document",
+  "arguments": {
+    "path": "main.go"
+  }
+}
+```
+
+##### Organize Imports
+
+```json
+{
+  "name": "organize_imports",
+  "arguments": {
+    "path": "client.go"
+  }
+}
+```
+
+##### Get Inlay Hints
+
+```json
+{
+  "name": "get_inlay_hints",
+  "arguments": {
+    "path": "main.go",
+    "startLine": 10,
+    "startChar": 0,
+    "endLine": 20,
+    "endChar": 50
   }
 }
 ```
@@ -391,6 +575,23 @@ This project implements a Model Context Protocol server that interfaces with gop
 - Add appropriate logging for debugging MCP interactions
 - Write tests for new functionality using the established patterns
 - Run tests and linter before committing changes
+
+### Modular Architecture Guidelines
+
+**Maintain Separation of Concerns**: When adding new LSP functionality, place it in the appropriate domain-specific file:
+
+- **Navigation tools** → `navigation.go`
+- **Diagnostic features** → `diagnostic.go`
+- **Symbol operations** → `symbols.go`
+- **Code assistance** → `completion.go`
+- **Formatting/maintenance** → `formatting.go`
+- **Core types** → `types.go`
+- **Common parsing** → `parsing.go`
+- **Infrastructure** → `client.go`
+
+**File Size Guidelines**: Keep individual files focused and reasonably sized (100-400 lines). If a file grows beyond ~500 lines, consider further subdivision by functionality.
+
+**Cross-File Dependencies**: All LSP functionality should operate through the central `goplsClient` struct. Avoid tight coupling between domain-specific files.
 
 ### Docker Development
 
