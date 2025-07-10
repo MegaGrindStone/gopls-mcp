@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -12,6 +13,7 @@ import (
 
 // GoToDefinitionParams represents parameters for go to definition requests.
 type GoToDefinitionParams struct {
+	Workspace string `json:"workspace"`
 	Path      string `json:"path"`
 	Line      int    `json:"line"`
 	Character int    `json:"character"`
@@ -19,6 +21,7 @@ type GoToDefinitionParams struct {
 
 // FindReferencesParams represents parameters for find references requests.
 type FindReferencesParams struct {
+	Workspace          string `json:"workspace"`
 	Path               string `json:"path"`
 	Line               int    `json:"line"`
 	Character          int    `json:"character"`
@@ -27,6 +30,7 @@ type FindReferencesParams struct {
 
 // GetHoverParams represents parameters for get hover info requests.
 type GetHoverParams struct {
+	Workspace string `json:"workspace"`
 	Path      string `json:"path"`
 	Line      int    `json:"line"`
 	Character int    `json:"character"`
@@ -34,21 +38,25 @@ type GetHoverParams struct {
 
 // GetDiagnosticsParams represents parameters for get diagnostics requests.
 type GetDiagnosticsParams struct {
-	Path string `json:"path"`
+	Workspace string `json:"workspace"`
+	Path      string `json:"path"`
 }
 
 // GetDocumentSymbolsParams represents parameters for get document symbols requests.
 type GetDocumentSymbolsParams struct {
-	Path string `json:"path"`
+	Workspace string `json:"workspace"`
+	Path      string `json:"path"`
 }
 
 // GetWorkspaceSymbolsParams represents parameters for get workspace symbols requests.
 type GetWorkspaceSymbolsParams struct {
-	Query string `json:"query"`
+	Workspace string `json:"workspace"`
+	Query     string `json:"query"`
 }
 
 // GetSignatureHelpParams represents parameters for get signature help requests.
 type GetSignatureHelpParams struct {
+	Workspace string `json:"workspace"`
 	Path      string `json:"path"`
 	Line      int    `json:"line"`
 	Character int    `json:"character"`
@@ -56,6 +64,7 @@ type GetSignatureHelpParams struct {
 
 // GetCompletionsParams represents parameters for get completions requests.
 type GetCompletionsParams struct {
+	Workspace string `json:"workspace"`
 	Path      string `json:"path"`
 	Line      int    `json:"line"`
 	Character int    `json:"character"`
@@ -63,6 +72,7 @@ type GetCompletionsParams struct {
 
 // GetTypeDefinitionParams represents parameters for get type definition requests.
 type GetTypeDefinitionParams struct {
+	Workspace string `json:"workspace"`
 	Path      string `json:"path"`
 	Line      int    `json:"line"`
 	Character int    `json:"character"`
@@ -70,6 +80,7 @@ type GetTypeDefinitionParams struct {
 
 // FindImplementationsParams represents parameters for find implementations requests.
 type FindImplementationsParams struct {
+	Workspace string `json:"workspace"`
 	Path      string `json:"path"`
 	Line      int    `json:"line"`
 	Character int    `json:"character"`
@@ -77,21 +88,29 @@ type FindImplementationsParams struct {
 
 // FormatDocumentParams represents parameters for format document requests.
 type FormatDocumentParams struct {
-	Path string `json:"path"`
+	Workspace string `json:"workspace"`
+	Path      string `json:"path"`
 }
 
 // OrganizeImportsParams represents parameters for organize imports requests.
 type OrganizeImportsParams struct {
-	Path string `json:"path"`
+	Workspace string `json:"workspace"`
+	Path      string `json:"path"`
 }
 
 // GetInlayHintsParams represents parameters for get inlay hints requests.
 type GetInlayHintsParams struct {
+	Workspace string `json:"workspace"`
 	Path      string `json:"path"`
 	StartLine int    `json:"startLine"`
 	StartChar int    `json:"startChar"`
 	EndLine   int    `json:"endLine"`
 	EndChar   int    `json:"endChar"`
+}
+
+// ListWorkspacesParams represents parameters for list workspaces requests.
+type ListWorkspacesParams struct {
+	// No parameters needed
 }
 
 // MCP tool result types
@@ -243,16 +262,39 @@ type GetInlayHintsResult struct {
 	Hints []InlayHintResult `json:"hints"`
 }
 
-// mcpTools wraps a goplsClient to provide MCP tool functionality.
-type mcpTools struct {
-	client *goplsClient
+// WorkspaceInfo represents information about a workspace.
+type WorkspaceInfo struct {
+	Path string `json:"path"`
+	Name string `json:"name"`
 }
 
-// newMCPTools creates a new MCP tools instance wrapping the given goplsClient.
-func newMCPTools(client *goplsClient) mcpTools {
+// ListWorkspacesResult represents the result of a list workspaces request.
+type ListWorkspacesResult struct {
+	Workspaces []WorkspaceInfo `json:"workspaces"`
+}
+
+// mcpTools wraps multiple goplsClients to provide MCP tool functionality.
+type mcpTools struct {
+	clients map[string]*goplsClient
+}
+
+// newMCPTools creates a new MCP tools instance wrapping the given goplsClients.
+func newMCPTools(clients map[string]*goplsClient) mcpTools {
 	return mcpTools{
-		client: client,
+		clients: clients,
 	}
+}
+
+// getClient returns the goplsClient for the specified workspace.
+func (m mcpTools) getClient(workspace string) (*goplsClient, error) {
+	client, exists := m.clients[workspace]
+	if !exists {
+		return nil, fmt.Errorf("workspace not found: %s", workspace)
+	}
+	if !client.isRunning() {
+		return nil, fmt.Errorf("gopls is not running for workspace: %s", workspace)
+	}
+	return client, nil
 }
 
 // convertLocationsToResults converts Location structs to LocationResult structs.
@@ -351,17 +393,52 @@ func (m mcpTools) convertInlayHintsToResults(inlayHints []InlayHint) []InlayHint
 
 // MCP tool handlers
 
+// HandleListWorkspaces handles list workspaces requests.
+func (m mcpTools) HandleListWorkspaces(
+	_ context.Context,
+	_ *mcp.ServerSession,
+	_ *mcp.CallToolParamsFor[ListWorkspacesParams],
+) (*mcp.CallToolResultFor[ListWorkspacesResult], error) {
+	workspaces := make([]WorkspaceInfo, 0, len(m.clients))
+	for workspacePath := range m.clients {
+		workspaces = append(workspaces, WorkspaceInfo{
+			Path: workspacePath,
+			Name: filepath.Base(workspacePath),
+		})
+	}
+
+	result := ListWorkspacesResult{
+		Workspaces: workspaces,
+	}
+
+	jsonData, err := json.Marshal(result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal result: %w", err)
+	}
+
+	return &mcp.CallToolResultFor[ListWorkspacesResult]{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: string(jsonData),
+			},
+		},
+	}, nil
+}
+
 // HandleGoToDefinition handles go to definition requests.
+//
+//nolint:dupl // Similar pattern across location-based handlers is acceptable
 func (m mcpTools) HandleGoToDefinition(
 	_ context.Context,
 	_ *mcp.ServerSession,
 	params *mcp.CallToolParamsFor[GoToDefinitionParams],
 ) (*mcp.CallToolResultFor[GoToDefinitionResult], error) {
-	if !m.client.isRunning() {
-		return nil, fmt.Errorf("gopls is not running")
+	client, err := m.getClient(params.Arguments.Workspace)
+	if err != nil {
+		return nil, err
 	}
 
-	locations, err := m.client.goToDefinition(params.Arguments.Path, params.Arguments.Line, params.Arguments.Character)
+	locations, err := client.goToDefinition(params.Arguments.Path, params.Arguments.Line, params.Arguments.Character)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get definition: %w", err)
 	}
@@ -390,11 +467,12 @@ func (m mcpTools) HandleFindReferences(
 	_ *mcp.ServerSession,
 	params *mcp.CallToolParamsFor[FindReferencesParams],
 ) (*mcp.CallToolResultFor[FindReferencesResult], error) {
-	if !m.client.isRunning() {
-		return nil, fmt.Errorf("gopls is not running")
+	client, err := m.getClient(params.Arguments.Workspace)
+	if err != nil {
+		return nil, err
 	}
 
-	locations, err := m.client.findReferences(
+	locations, err := client.findReferences(
 		params.Arguments.Path,
 		params.Arguments.Line,
 		params.Arguments.Character,
@@ -428,11 +506,12 @@ func (m mcpTools) HandleGetHover(
 	_ *mcp.ServerSession,
 	params *mcp.CallToolParamsFor[GetHoverParams],
 ) (*mcp.CallToolResultFor[GetHoverResult], error) {
-	if !m.client.isRunning() {
-		return nil, fmt.Errorf("gopls is not running")
+	client, err := m.getClient(params.Arguments.Workspace)
+	if err != nil {
+		return nil, err
 	}
 
-	hover, err := m.client.getHover(params.Arguments.Path, params.Arguments.Line, params.Arguments.Character)
+	hover, err := client.getHover(params.Arguments.Path, params.Arguments.Line, params.Arguments.Character)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get hover info: %w", err)
 	}
@@ -472,11 +551,12 @@ func (m mcpTools) HandleGetDiagnostics(
 	_ *mcp.ServerSession,
 	params *mcp.CallToolParamsFor[GetDiagnosticsParams],
 ) (*mcp.CallToolResultFor[GetDiagnosticsResult], error) {
-	if !m.client.isRunning() {
-		return nil, fmt.Errorf("gopls is not running")
+	client, err := m.getClient(params.Arguments.Workspace)
+	if err != nil {
+		return nil, err
 	}
 
-	diagnostics, err := m.client.getDiagnostics(params.Arguments.Path)
+	diagnostics, err := client.getDiagnostics(params.Arguments.Path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get diagnostics: %w", err)
 	}
@@ -523,11 +603,12 @@ func (m mcpTools) HandleGetDocumentSymbols(
 	_ *mcp.ServerSession,
 	params *mcp.CallToolParamsFor[GetDocumentSymbolsParams],
 ) (*mcp.CallToolResultFor[GetDocumentSymbolsResult], error) {
-	if !m.client.isRunning() {
-		return nil, fmt.Errorf("gopls is not running")
+	client, err := m.getClient(params.Arguments.Workspace)
+	if err != nil {
+		return nil, err
 	}
 
-	symbols, err := m.client.getDocumentSymbols(params.Arguments.Path)
+	symbols, err := client.getDocumentSymbols(params.Arguments.Path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get document symbols: %w", err)
 	}
@@ -562,11 +643,12 @@ func (m mcpTools) HandleGetWorkspaceSymbols(
 	_ *mcp.ServerSession,
 	params *mcp.CallToolParamsFor[GetWorkspaceSymbolsParams],
 ) (*mcp.CallToolResultFor[GetWorkspaceSymbolsResult], error) {
-	if !m.client.isRunning() {
-		return nil, fmt.Errorf("gopls is not running")
+	client, err := m.getClient(params.Arguments.Workspace)
+	if err != nil {
+		return nil, err
 	}
 
-	symbols, err := m.client.getWorkspaceSymbols(params.Arguments.Query)
+	symbols, err := client.getWorkspaceSymbols(params.Arguments.Query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get workspace symbols: %w", err)
 	}
@@ -607,11 +689,12 @@ func (m mcpTools) HandleGetSignatureHelp(
 	_ *mcp.ServerSession,
 	params *mcp.CallToolParamsFor[GetSignatureHelpParams],
 ) (*mcp.CallToolResultFor[GetSignatureHelpResult], error) {
-	if !m.client.isRunning() {
-		return nil, fmt.Errorf("gopls is not running")
+	client, err := m.getClient(params.Arguments.Workspace)
+	if err != nil {
+		return nil, err
 	}
 
-	signatureHelp, err := m.client.getSignatureHelp(
+	signatureHelp, err := client.getSignatureHelp(
 		params.Arguments.Path, params.Arguments.Line, params.Arguments.Character)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get signature help: %w", err)
@@ -657,11 +740,12 @@ func (m mcpTools) HandleGetCompletions(
 	_ *mcp.ServerSession,
 	params *mcp.CallToolParamsFor[GetCompletionsParams],
 ) (*mcp.CallToolResultFor[GetCompletionsResult], error) {
-	if !m.client.isRunning() {
-		return nil, fmt.Errorf("gopls is not running")
+	client, err := m.getClient(params.Arguments.Workspace)
+	if err != nil {
+		return nil, err
 	}
 
-	completions, err := m.client.getCompletions(params.Arguments.Path, params.Arguments.Line, params.Arguments.Character)
+	completions, err := client.getCompletions(params.Arguments.Path, params.Arguments.Line, params.Arguments.Character)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get completions: %w", err)
 	}
@@ -692,16 +776,19 @@ func (m mcpTools) HandleGetCompletions(
 }
 
 // HandleGetTypeDefinition handles get type definition requests.
+//
+//nolint:dupl // Similar pattern across location-based handlers is acceptable
 func (m mcpTools) HandleGetTypeDefinition(
 	_ context.Context,
 	_ *mcp.ServerSession,
 	params *mcp.CallToolParamsFor[GetTypeDefinitionParams],
 ) (*mcp.CallToolResultFor[GetTypeDefinitionResult], error) {
-	if !m.client.isRunning() {
-		return nil, fmt.Errorf("gopls is not running")
+	client, err := m.getClient(params.Arguments.Workspace)
+	if err != nil {
+		return nil, err
 	}
 
-	locations, err := m.client.getTypeDefinition(params.Arguments.Path, params.Arguments.Line, params.Arguments.Character)
+	locations, err := client.getTypeDefinition(params.Arguments.Path, params.Arguments.Line, params.Arguments.Character)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get type definition: %w", err)
 	}
@@ -725,16 +812,19 @@ func (m mcpTools) HandleGetTypeDefinition(
 }
 
 // HandleFindImplementations handles find implementations requests.
+//
+//nolint:dupl // Similar pattern across location-based handlers is acceptable
 func (m mcpTools) HandleFindImplementations(
 	_ context.Context,
 	_ *mcp.ServerSession,
 	params *mcp.CallToolParamsFor[FindImplementationsParams],
 ) (*mcp.CallToolResultFor[FindImplementationsResult], error) {
-	if !m.client.isRunning() {
-		return nil, fmt.Errorf("gopls is not running")
+	client, err := m.getClient(params.Arguments.Workspace)
+	if err != nil {
+		return nil, err
 	}
 
-	locations, err := m.client.findImplementations(
+	locations, err := client.findImplementations(
 		params.Arguments.Path, params.Arguments.Line, params.Arguments.Character)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find implementations: %w", err)
@@ -764,11 +854,12 @@ func (m mcpTools) HandleFormatDocument(
 	_ *mcp.ServerSession,
 	params *mcp.CallToolParamsFor[FormatDocumentParams],
 ) (*mcp.CallToolResultFor[FormatDocumentResult], error) {
-	if !m.client.isRunning() {
-		return nil, fmt.Errorf("gopls is not running")
+	client, err := m.getClient(params.Arguments.Workspace)
+	if err != nil {
+		return nil, err
 	}
 
-	textEdits, err := m.client.formatDocument(params.Arguments.Path)
+	textEdits, err := client.formatDocument(params.Arguments.Path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to format document: %w", err)
 	}
@@ -797,11 +888,12 @@ func (m mcpTools) HandleOrganizeImports(
 	_ *mcp.ServerSession,
 	params *mcp.CallToolParamsFor[OrganizeImportsParams],
 ) (*mcp.CallToolResultFor[OrganizeImportsResult], error) {
-	if !m.client.isRunning() {
-		return nil, fmt.Errorf("gopls is not running")
+	client, err := m.getClient(params.Arguments.Workspace)
+	if err != nil {
+		return nil, err
 	}
 
-	textEdits, err := m.client.organizeImports(params.Arguments.Path)
+	textEdits, err := client.organizeImports(params.Arguments.Path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to organize imports: %w", err)
 	}
@@ -830,11 +922,12 @@ func (m mcpTools) HandleGetInlayHints(
 	_ *mcp.ServerSession,
 	params *mcp.CallToolParamsFor[GetInlayHintsParams],
 ) (*mcp.CallToolResultFor[GetInlayHintsResult], error) {
-	if !m.client.isRunning() {
-		return nil, fmt.Errorf("gopls is not running")
+	client, err := m.getClient(params.Arguments.Workspace)
+	if err != nil {
+		return nil, err
 	}
 
-	inlayHints, err := m.client.getInlayHints(
+	inlayHints, err := client.getInlayHints(
 		params.Arguments.Path,
 		params.Arguments.StartLine,
 		params.Arguments.StartChar,
@@ -865,6 +958,16 @@ func (m mcpTools) HandleGetInlayHints(
 
 // MCP tool creation methods
 
+// CreateListWorkspacesTool creates the list workspaces MCP tool.
+func (m mcpTools) CreateListWorkspacesTool() *mcp.ServerTool {
+	return mcp.NewServerTool[ListWorkspacesParams, ListWorkspacesResult](
+		"list_workspaces",
+		"List all available Go workspaces configured in the server",
+		m.HandleListWorkspaces,
+		mcp.Input(),
+	)
+}
+
 // CreateGoToDefinitionTool creates the go to definition MCP tool.
 func (m mcpTools) CreateGoToDefinitionTool() *mcp.ServerTool {
 	return mcp.NewServerTool[GoToDefinitionParams, GoToDefinitionResult](
@@ -872,6 +975,7 @@ func (m mcpTools) CreateGoToDefinitionTool() *mcp.ServerTool {
 		"Navigate to the definition of a symbol at the specified position in a Go file",
 		m.HandleGoToDefinition,
 		mcp.Input(
+			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
 			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
 			mcp.Property("line", mcp.Description("Line number (0-based)"), mcp.Required(true)),
 			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
@@ -886,6 +990,7 @@ func (m mcpTools) CreateFindReferencesTool() *mcp.ServerTool {
 		"Find all references to a symbol at the specified position in a Go file",
 		m.HandleFindReferences,
 		mcp.Input(
+			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
 			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
 			mcp.Property("line", mcp.Description("Line number (0-based)"), mcp.Required(true)),
 			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
@@ -901,6 +1006,7 @@ func (m mcpTools) CreateGetHoverTool() *mcp.ServerTool {
 		"Get hover information (documentation, type info) for a symbol at the specified position",
 		m.HandleGetHover,
 		mcp.Input(
+			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
 			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
 			mcp.Property("line", mcp.Description("Line number (0-based)"), mcp.Required(true)),
 			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
@@ -915,6 +1021,7 @@ func (m mcpTools) CreateGetDiagnosticsTool() *mcp.ServerTool {
 		"Get compilation errors, warnings, and other diagnostics for a Go file",
 		m.HandleGetDiagnostics,
 		mcp.Input(
+			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
 			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
 		),
 	)
@@ -927,6 +1034,7 @@ func (m mcpTools) CreateGetDocumentSymbolsTool() *mcp.ServerTool {
 		"Get outline of symbols (functions, types, etc.) defined in a Go file",
 		m.HandleGetDocumentSymbols,
 		mcp.Input(
+			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
 			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
 		),
 	)
@@ -939,6 +1047,7 @@ func (m mcpTools) CreateGetWorkspaceSymbolsTool() *mcp.ServerTool {
 		"Search for symbols across the entire Go workspace/project",
 		m.HandleGetWorkspaceSymbols,
 		mcp.Input(
+			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
 			mcp.Property("query",
 				mcp.Description("Search query for symbol names (supports fuzzy matching)"),
 				mcp.Required(true)),
@@ -953,6 +1062,7 @@ func (m mcpTools) CreateGetSignatureHelpTool() *mcp.ServerTool {
 		"Get function signature help (parameter information) at the specified position",
 		m.HandleGetSignatureHelp,
 		mcp.Input(
+			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
 			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
 			mcp.Property("line", mcp.Description("Line number (0-based)"), mcp.Required(true)),
 			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
@@ -967,6 +1077,7 @@ func (m mcpTools) CreateGetCompletionsTool() *mcp.ServerTool {
 		"Get code completion suggestions at the specified position",
 		m.HandleGetCompletions,
 		mcp.Input(
+			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
 			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
 			mcp.Property("line", mcp.Description("Line number (0-based)"), mcp.Required(true)),
 			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
@@ -981,6 +1092,7 @@ func (m mcpTools) CreateGetTypeDefinitionTool() *mcp.ServerTool {
 		"Navigate to the type definition of a symbol at the specified position",
 		m.HandleGetTypeDefinition,
 		mcp.Input(
+			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
 			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
 			mcp.Property("line", mcp.Description("Line number (0-based)"), mcp.Required(true)),
 			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
@@ -995,6 +1107,7 @@ func (m mcpTools) CreateFindImplementationsTool() *mcp.ServerTool {
 		"Find all implementations of an interface or method at the specified position",
 		m.HandleFindImplementations,
 		mcp.Input(
+			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
 			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
 			mcp.Property("line", mcp.Description("Line number (0-based)"), mcp.Required(true)),
 			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
@@ -1009,6 +1122,7 @@ func (m mcpTools) CreateFormatDocumentTool() *mcp.ServerTool {
 		"Format a Go source file according to gofmt standards",
 		m.HandleFormatDocument,
 		mcp.Input(
+			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
 			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
 		),
 	)
@@ -1021,6 +1135,7 @@ func (m mcpTools) CreateOrganizeImportsTool() *mcp.ServerTool {
 		"Organize and clean up import statements in a Go file",
 		m.HandleOrganizeImports,
 		mcp.Input(
+			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
 			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
 		),
 	)
@@ -1033,6 +1148,7 @@ func (m mcpTools) CreateGetInlayHintsTool() *mcp.ServerTool {
 		"Get inlay hints (implicit parameter names, type information) for a range in a Go file",
 		m.HandleGetInlayHints,
 		mcp.Input(
+			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
 			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
 			mcp.Property("startLine", mcp.Description("Start line number (0-based)"), mcp.Required(true)),
 			mcp.Property("startChar", mcp.Description("Start character position (0-based)"), mcp.Required(true)),
@@ -1043,15 +1159,18 @@ func (m mcpTools) CreateGetInlayHintsTool() *mcp.ServerTool {
 }
 
 // setupMCPServer creates and configures the MCP server with gopls tools.
-func setupMCPServer(client *goplsClient) *mcp.Server {
+func setupMCPServer(clients map[string]*goplsClient) *mcp.Server {
 	// Create MCP server
 	server := mcp.NewServer("gopls-mcp", "v0.3.0", nil)
 
 	// Create MCP tools wrapper
-	tools := newMCPTools(client)
+	tools := newMCPTools(clients)
 
 	// Add gopls tools
 	server.AddTools(
+		// Workspace management tools
+		tools.CreateListWorkspacesTool(),
+
 		// Core navigation tools
 		tools.CreateGoToDefinitionTool(),
 		tools.CreateFindReferencesTool(),

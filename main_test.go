@@ -122,8 +122,9 @@ func TestMCPToolsCreation(t *testing.T) {
 	logger := newTestLogger()
 	client := newClient(workspacePath, logger)
 
-	// Create mcpTools wrapper
-	mcpToolsWrapper := newMCPTools(client)
+	// Create mcpTools wrapper with client map
+	clients := map[string]*goplsClient{workspacePath: client}
+	mcpToolsWrapper := newMCPTools(clients)
 
 	// Test tool creation
 	tools := []*mcp.ServerTool{
@@ -319,8 +320,9 @@ func TestSetupMCPServer(t *testing.T) {
 	logger := newTestLogger()
 	client := newClient(workspacePath, logger)
 
-	// Test server setup
-	server := setupMCPServer(client)
+	// Test server setup with client map
+	clients := map[string]*goplsClient{workspacePath: client}
+	server := setupMCPServer(clients)
 
 	if server == nil {
 		t.Fatal("Expected non-nil MCP server")

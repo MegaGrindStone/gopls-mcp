@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Go project for implementing a Model Context Protocol (MCP) server for gopls (Go language server). The server supports both HTTP and stdio transports to provide Go language server capabilities to MCP clients like Claude.
+This is a Go project for implementing a Model Context Protocol (MCP) server for gopls (Go language server). The server supports both HTTP and stdio transports to provide Go language server capabilities to MCP clients like Claude with full multi-workspace support.
 
 ## 🚨 MANDATORY Go Coding Guidelines
 
@@ -96,13 +96,13 @@ gh release delete v1.0.0
 
 - **Module**: `github.com/MegaGrindStone/gopls-mcp`
 - **Go Version**: 1.24.4
-- **Current State**: Enhanced MCP server with comprehensive gopls integration, 13 powerful tools, Docker support, and CI/CD pipeline
-- **Purpose**: Full-featured MCP server for gopls integration with AI assistants
+- **Current State**: Enhanced MCP server with comprehensive gopls integration, 14 powerful tools, full multi-workspace support, Docker support, and CI/CD pipeline
+- **Purpose**: Full-featured MCP server for gopls integration with AI assistants supporting multiple Go workspaces simultaneously
 - **Transport**: HTTP and stdio transports (MCP specification compliant)
 - **Dependencies**: `github.com/modelcontextprotocol/go-sdk`
 - **Deployment**: Docker Hub (`megagrindstone/gopls-mcp`) with multi-platform support
 - **CI/CD**: GitHub Actions with comprehensive quality gates and automated Docker builds
-- **Tools**: 13 comprehensive gopls tools covering navigation, diagnostics, code assistance, and maintenance
+- **Tools**: 14 comprehensive gopls tools covering workspace management, navigation, diagnostics, code assistance, and maintenance
 
 ### Key Components
 
@@ -142,6 +142,22 @@ The LSP client functionality has been refactored into 8 focused, single-responsi
 
 **Consistent Error Handling**: All LSP methods follow the same error handling patterns with proper context and early returns.
 
+### Multi-Workspace Architecture
+
+**Design Philosophy**: The system supports multiple workspaces through a clean separation of concerns:
+
+- **Single-Workspace Client**: Each `goplsClient` manages exactly one workspace with its own gopls process
+- **Multi-Client Orchestration**: The `mcpTools` struct manages a map of workspace paths to `goplsClient` instances
+- **Explicit Workspace Selection**: All MCP tools require a `workspace` parameter for clear, unambiguous routing
+- **Workspace Discovery**: The `list_workspaces` tool provides workspace enumeration for clients
+
+**Benefits**:
+
+- **Process Isolation**: Each workspace gets its own dedicated gopls process for reliability
+- **Parallel Processing**: Multiple gopls instances can work simultaneously across workspaces
+- **Clear Routing**: No path resolution ambiguity - workspace is explicitly specified
+- **Zero Risk**: Existing single-workspace `goplsClient` code remains unchanged
+
 ## Testing
 
 ### Testing Strategy
@@ -172,33 +188,37 @@ go test -v client_integration_test.go
 
 ### Available MCP Tools
 
+#### Workspace Management Tools
+
+1. **list_workspaces**: List all available Go workspaces configured in the server
+
 #### Core Navigation Tools
 
-1. **go_to_definition**: Navigate to symbol definitions
-2. **find_references**: Find all references to a symbol
-3. **get_hover_info**: Get documentation and type information
+2. **go_to_definition**: Navigate to symbol definitions
+3. **find_references**: Find all references to a symbol
+4. **get_hover_info**: Get documentation and type information
 
 #### Diagnostic and Analysis Tools
 
-4. **get_diagnostics**: Get compilation errors, warnings, and diagnostics for a Go file
-5. **get_document_symbols**: Get outline of symbols (functions, types, etc.) defined in a Go file
-6. **get_workspace_symbols**: Search for symbols across the entire Go workspace/project
+5. **get_diagnostics**: Get compilation errors, warnings, and diagnostics for a Go file
+6. **get_document_symbols**: Get outline of symbols (functions, types, etc.) defined in a Go file
+7. **get_workspace_symbols**: Search for symbols across the entire Go workspace/project
 
 #### Code Assistance Tools
 
-7. **get_signature_help**: Get function signature help (parameter information) at the specified position
-8. **get_completions**: Get code completion suggestions at the specified position
+8. **get_signature_help**: Get function signature help (parameter information) at the specified position
+9. **get_completions**: Get code completion suggestions at the specified position
 
 #### Advanced Navigation Tools
 
-9. **get_type_definition**: Navigate to the type definition of a symbol at the specified position
-10. **find_implementations**: Find all implementations of an interface or method at the specified position
+10. **get_type_definition**: Navigate to the type definition of a symbol at the specified position
+11. **find_implementations**: Find all implementations of an interface or method at the specified position
 
 #### Code Maintenance Tools
 
-11. **format_document**: Format a Go source file according to gofmt standards
-12. **organize_imports**: Organize and clean up import statements in a Go file
-13. **get_inlay_hints**: Get inlay hints (implicit parameter names, type information) for a range in a Go file
+12. **format_document**: Format a Go source file according to gofmt standards
+13. **organize_imports**: Organize and clean up import statements in a Go file
+14. **get_inlay_hints**: Get inlay hints (implicit parameter names, type information) for a range in a Go file
 
 ### MCP Architecture (mcp.go)
 
@@ -206,9 +226,10 @@ The MCP layer is cleanly separated in `mcp.go` and follows Go best practices:
 
 **Architecture Pattern:**
 
-- **`mcpTools` struct**: Wraps `goplsClient` for MCP functionality
+- **`mcpTools` struct**: Wraps multiple `goplsClient` instances for multi-workspace MCP functionality
 - **Value receivers**: All methods use `(m mcpTools)` following Go guidelines for small structs
-- **Direct path handling**: Accepts workspace-relative paths directly for simplicity
+- **Explicit workspace routing**: All tools require workspace parameter for clear client selection
+- **Client validation**: Built-in workspace validation and client routing via `getClient()` helper
 - **Error handling**: Proper error propagation and context
 
 **Key Components:**
@@ -234,43 +255,70 @@ The MCP layer is cleanly separated in `mcp.go` and follows Go best practices:
 #### Native Go
 
 ```bash
-# Start server with HTTP transport (default)
+# Single workspace (traditional usage)
 ./gopls-mcp -workspace /path/to/go/project
 ./gopls-mcp -workspace /path/to/go/project -transport http
+
+# Multiple workspaces (new multi-workspace support)
+./gopls-mcp -workspace /project1,/project2,/project3
+./gopls-mcp -workspace "/path/with spaces/project1,/project2"
 
 # Start server with stdio transport
 ./gopls-mcp -workspace /path/to/go/project -transport stdio
 
 # Or build and run with go
 go run . -workspace /path/to/go/project -transport http
-go run . -workspace /path/to/go/project -transport stdio
+go run . -workspace /project1,/project2 -transport stdio
 
 # With logging configuration
-LOG_LEVEL=DEBUG ./gopls-mcp -workspace /path/to/go/project
+LOG_LEVEL=DEBUG ./gopls-mcp -workspace /project1,/project2
 LOG_FORMAT=json LOG_LEVEL=WARN ./gopls-mcp -workspace /path/to/go/project
 ```
 
 #### Docker
 
 ```bash
-# Quick start with Docker Hub image
+# Single workspace with Docker Hub image
 docker run -v /path/to/go/project:/workspace -p 8080:8080 megagrindstone/gopls-mcp:latest
 
-# With custom workspace path
+# Multiple workspaces (mount each workspace separately)
+docker run \
+  -v /project1:/workspace1 \
+  -v /project2:/workspace2 \
+  -v /project3:/workspace3 \
+  -p 8080:8080 \
+  megagrindstone/gopls-mcp:latest -workspace /workspace1,/workspace2,/workspace3
+
+# With custom workspace paths
 docker run -v /path/to/go/project:/custom/path -p 8080:8080 megagrindstone/gopls-mcp:latest -workspace /custom/path
 
 # Local development with built image
 docker build -t gopls-mcp .
 docker run -v /path/to/go/project:/workspace -p 8080:8080 gopls-mcp
 
-# With logging configuration
-docker run -e LOG_LEVEL=DEBUG -v /path/to/go/project:/workspace -p 8080:8080 megagrindstone/gopls-mcp:latest
-docker run -e LOG_FORMAT=json -e LOG_LEVEL=INFO -v /path/to/go/project:/workspace -p 8080:8080 megagrindstone/gopls-mcp:latest
+# Multi-workspace with logging configuration
+docker run \
+  -e LOG_LEVEL=DEBUG \
+  -v /project1:/workspace1 \
+  -v /project2:/workspace2 \
+  -p 8080:8080 \
+  megagrindstone/gopls-mcp:latest -workspace /workspace1,/workspace2
 ```
 
 The HTTP transport server will start on port 8080 at `http://localhost:8080`. The stdio transport communicates via standard input/output.
 
 ### MCP Tool Examples
+
+#### Workspace Management Tools
+
+##### List Workspaces
+
+```json
+{
+  "name": "list_workspaces",
+  "arguments": {}
+}
+```
 
 #### Core Navigation Tools
 
@@ -280,6 +328,7 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
 {
   "name": "go_to_definition",
   "arguments": {
+    "workspace": "/path/to/workspace",
     "path": "main.go",
     "line": 10,
     "character": 5
@@ -293,6 +342,7 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
 {
   "name": "find_references",
   "arguments": {
+    "workspace": "/path/to/workspace",
     "path": "pkg/client.go",
     "line": 10,
     "character": 5,
@@ -307,6 +357,7 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
 {
   "name": "get_hover_info",
   "arguments": {
+    "workspace": "/path/to/workspace",
     "path": "mcp.go",
     "line": 10,
     "character": 5
@@ -322,6 +373,7 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
 {
   "name": "get_diagnostics",
   "arguments": {
+    "workspace": "/path/to/workspace",
     "path": "main.go"
   }
 }
@@ -333,6 +385,7 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
 {
   "name": "get_document_symbols",
   "arguments": {
+    "workspace": "/path/to/workspace",
     "path": "client.go"
   }
 }
@@ -344,6 +397,7 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
 {
   "name": "get_workspace_symbols",
   "arguments": {
+    "workspace": "/path/to/workspace",
     "query": "Client"
   }
 }
@@ -357,6 +411,7 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
 {
   "name": "get_signature_help",
   "arguments": {
+    "workspace": "/path/to/workspace",
     "path": "main.go",
     "line": 15,
     "character": 20
@@ -370,6 +425,7 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
 {
   "name": "get_completions",
   "arguments": {
+    "workspace": "/path/to/workspace",
     "path": "main.go",
     "line": 8,
     "character": 5
@@ -385,6 +441,7 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
 {
   "name": "get_type_definition",
   "arguments": {
+    "workspace": "/path/to/workspace",
     "path": "client.go",
     "line": 25,
     "character": 10
@@ -398,6 +455,7 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
 {
   "name": "find_implementations",
   "arguments": {
+    "workspace": "/path/to/workspace",
     "path": "interfaces.go",
     "line": 12,
     "character": 8
@@ -413,6 +471,7 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
 {
   "name": "format_document",
   "arguments": {
+    "workspace": "/path/to/workspace",
     "path": "main.go"
   }
 }
@@ -424,6 +483,7 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
 {
   "name": "organize_imports",
   "arguments": {
+    "workspace": "/path/to/workspace",
     "path": "client.go"
   }
 }
@@ -435,6 +495,7 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
 {
   "name": "get_inlay_hints",
   "arguments": {
+    "workspace": "/path/to/workspace",
     "path": "main.go",
     "startLine": 10,
     "startChar": 0,
@@ -448,7 +509,7 @@ The HTTP transport server will start on port 8080 at `http://localhost:8080`. Th
 
 ### Command-line Flags
 
-- **-workspace**: Required command-line flag to set the Go workspace path
+- **-workspace**: Required command-line flag to set Go workspace path(s). Accepts single path or comma-separated list for multiple workspaces
 - **-transport**: Transport type, accepts 'http' or 'stdio' (defaults to 'http')
 
 ### Environment Variables
@@ -554,9 +615,10 @@ Automated release pipeline (`.github/workflows/release.yaml`) that:
 This project implements a Model Context Protocol server that interfaces with gopls using:
 
 1. **Multi-Transport Support**: HTTP and stdio transports for MCP specification compliance
-2. **gopls Integration**: Subprocess management with LSP communication
-3. **MCP Tools**: Structured tools for Go language server features
-4. **Graceful Shutdown**: Proper cleanup of gopls processes
+2. **Multi-Workspace Support**: Full support for multiple Go workspaces with explicit workspace selection
+3. **gopls Integration**: Subprocess management with LSP communication (one gopls process per workspace)
+4. **MCP Tools**: 14 structured tools for Go language server features including workspace management
+5. **Graceful Shutdown**: Proper cleanup of all gopls processes across workspaces
 
 ## Development Guidelines
 

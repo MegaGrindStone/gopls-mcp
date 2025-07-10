@@ -9,7 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Expanded MCP Tool Suite**: Increased from 3 to 13 comprehensive MCP tools across 5 categories:
+- **Multi-Workspace Support**: Full support for multiple Go workspaces with explicit workspace selection
+  - **Comma-Separated Workspace Paths**: Accept multiple workspaces via `-workspace /project1,/project2,/project3`
+  - **Workspace Management Tool**: New `list_workspaces` tool to discover available workspaces
+  - **Explicit Workspace Routing**: All tools now require `workspace` parameter for clear client selection
+  - **Process Isolation**: Each workspace gets its own dedicated gopls process for reliability
+  - **Parallel Processing**: Multiple gopls instances can work simultaneously across workspaces
+  - **Docker Multi-Workspace**: Support for mounting and managing multiple workspaces in containers
+- **Expanded MCP Tool Suite**: Increased from 3 to 14 comprehensive MCP tools across 6 categories:
+  - **Workspace Management Tools** (1): `list_workspaces`
   - **Core Navigation Tools** (3): `go_to_definition`, `find_references`, `get_hover_info`
   - **Diagnostic and Analysis Tools** (3): `get_diagnostics`, `get_document_symbols`, `get_workspace_symbols`
   - **Code Assistance Tools** (2): `get_signature_help`, `get_completions`
@@ -28,11 +36,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BREAKING**: All MCP tools now require `workspace` parameter for explicit workspace selection and routing
+- **Multi-Client Architecture**: `mcpTools` struct now manages multiple `goplsClient` instances instead of single client
+  - **Workspace Validation**: Added `getClient()` helper for workspace validation and client routing
+  - **Client Orchestration**: Clean separation between single-workspace clients and multi-client management
+  - **Command-Line Parsing**: Enhanced argument parsing with `parseAndValidateWorkspaces()` helper function
 - **Major Architecture Refactor**: Restructured codebase for better separation of concerns and maintainability
   - **Improved Separation**: Domain-driven organization by functional areas (navigation, diagnostics, completion, etc.)
   - **Enhanced Testing**: Replaced unit tests with comprehensive integration tests for real-world validation
   - **Cleaner API**: MCP tools now use workspace-relative paths instead of URIs for simplified usage
-  - **Better Documentation**: Updated `CLAUDE.md` with comprehensive architecture and testing details
+  - **Better Documentation**: Updated `CLAUDE.md` with comprehensive multi-workspace architecture and usage examples
   - **Shared Client Instance**: All LSP functionality operates through methods on the central `goplsClient` struct
   - **Consistent Error Handling**: All LSP methods follow the same error handling patterns with proper context
 
