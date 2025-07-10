@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Unnecessary Type Arguments**: Removed redundant type arguments from MCP tools and test functions to follow Go's type inference best practices
+  - **Root Cause**: Explicit type arguments in `mcp.NewServerTool[ParamType, ResultType]` and `parseJSONResult[ResultType]` calls were unnecessary as Go can infer types from function signatures
+  - **Solution**: Removed type arguments from 14 `mcp.NewServerTool` calls in `mcp.go` and 6 `parseJSONResult` calls in `mcp_integration_test.go`
+  - **Impact**: Cleaner, more idiomatic Go code following type inference best practices; resolved all 20 "unnecessary type arguments" diagnostics warnings
+  - **Files Modified**: `mcp.go` (14 fixes), `mcp_integration_test.go` (6 fixes)
+  - **Testing**: All tests pass, linter reports 0 issues, functionality remains intact
 - **Diagnostic Timing Bug**: Fixed inconsistent diagnostic results on first call to `get_diagnostics` by preventing premature acceptance of empty diagnostics
   - **Root Cause**: The stability mechanism was accepting empty diagnostics as "stable" after 200ms, but gopls takes ~2 seconds to complete analysis
   - **Solution**: Added `minWaitForNonEmpty = 3 * time.Second` constant to prevent accepting empty diagnostics within first 3 seconds

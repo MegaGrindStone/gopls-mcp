@@ -962,7 +962,7 @@ func (m mcpTools) HandleGetInlayHints(
 
 // CreateListWorkspacesTool creates the list workspaces MCP tool.
 func (m mcpTools) CreateListWorkspacesTool() *mcp.ServerTool {
-	return mcp.NewServerTool[ListWorkspacesParams, ListWorkspacesResult](
+	return mcp.NewServerTool(
 		"list_workspaces",
 		"List all available Go workspaces configured in the server",
 		m.HandleListWorkspaces,
@@ -972,7 +972,7 @@ func (m mcpTools) CreateListWorkspacesTool() *mcp.ServerTool {
 
 // CreateGoToDefinitionTool creates the go to definition MCP tool.
 func (m mcpTools) CreateGoToDefinitionTool() *mcp.ServerTool {
-	return mcp.NewServerTool[GoToDefinitionParams, GoToDefinitionResult](
+	return mcp.NewServerTool(
 		"go_to_definition",
 		"Navigate to the definition of a symbol at the specified position in a Go file",
 		m.HandleGoToDefinition,
@@ -987,7 +987,7 @@ func (m mcpTools) CreateGoToDefinitionTool() *mcp.ServerTool {
 
 // CreateFindReferencesTool creates the find references MCP tool.
 func (m mcpTools) CreateFindReferencesTool() *mcp.ServerTool {
-	return mcp.NewServerTool[FindReferencesParams, FindReferencesResult](
+	return mcp.NewServerTool(
 		"find_references",
 		"Find all references to a symbol at the specified position in a Go file",
 		m.HandleFindReferences,
@@ -1003,7 +1003,7 @@ func (m mcpTools) CreateFindReferencesTool() *mcp.ServerTool {
 
 // CreateGetHoverTool creates the get hover info MCP tool.
 func (m mcpTools) CreateGetHoverTool() *mcp.ServerTool {
-	return mcp.NewServerTool[GetHoverParams, GetHoverResult](
+	return mcp.NewServerTool(
 		"get_hover_info",
 		"Get hover information (documentation, type info) for a symbol at the specified position",
 		m.HandleGetHover,
@@ -1018,7 +1018,7 @@ func (m mcpTools) CreateGetHoverTool() *mcp.ServerTool {
 
 // CreateGetDiagnosticsTool creates the get diagnostics MCP tool.
 func (m mcpTools) CreateGetDiagnosticsTool() *mcp.ServerTool {
-	return mcp.NewServerTool[GetDiagnosticsParams, GetDiagnosticsResult](
+	return mcp.NewServerTool(
 		"get_diagnostics",
 		"Get compilation errors, warnings, and other diagnostics for a Go file",
 		m.HandleGetDiagnostics,
@@ -1031,7 +1031,7 @@ func (m mcpTools) CreateGetDiagnosticsTool() *mcp.ServerTool {
 
 // CreateGetDocumentSymbolsTool creates the get document symbols MCP tool.
 func (m mcpTools) CreateGetDocumentSymbolsTool() *mcp.ServerTool {
-	return mcp.NewServerTool[GetDocumentSymbolsParams, GetDocumentSymbolsResult](
+	return mcp.NewServerTool(
 		"get_document_symbols",
 		"Get outline of symbols (functions, types, etc.) defined in a Go file",
 		m.HandleGetDocumentSymbols,
@@ -1044,7 +1044,7 @@ func (m mcpTools) CreateGetDocumentSymbolsTool() *mcp.ServerTool {
 
 // CreateGetWorkspaceSymbolsTool creates the get workspace symbols MCP tool.
 func (m mcpTools) CreateGetWorkspaceSymbolsTool() *mcp.ServerTool {
-	return mcp.NewServerTool[GetWorkspaceSymbolsParams, GetWorkspaceSymbolsResult](
+	return mcp.NewServerTool(
 		"get_workspace_symbols",
 		"Search for symbols across the entire Go workspace/project",
 		m.HandleGetWorkspaceSymbols,
@@ -1059,7 +1059,7 @@ func (m mcpTools) CreateGetWorkspaceSymbolsTool() *mcp.ServerTool {
 
 // CreateGetSignatureHelpTool creates the get signature help MCP tool.
 func (m mcpTools) CreateGetSignatureHelpTool() *mcp.ServerTool {
-	return mcp.NewServerTool[GetSignatureHelpParams, GetSignatureHelpResult](
+	return mcp.NewServerTool(
 		"get_signature_help",
 		"Get function signature help (parameter information) at the specified position",
 		m.HandleGetSignatureHelp,
@@ -1074,7 +1074,7 @@ func (m mcpTools) CreateGetSignatureHelpTool() *mcp.ServerTool {
 
 // CreateGetCompletionsTool creates the get completions MCP tool.
 func (m mcpTools) CreateGetCompletionsTool() *mcp.ServerTool {
-	return mcp.NewServerTool[GetCompletionsParams, GetCompletionsResult](
+	return mcp.NewServerTool(
 		"get_completions",
 		"Get code completion suggestions at the specified position",
 		m.HandleGetCompletions,
@@ -1089,7 +1089,7 @@ func (m mcpTools) CreateGetCompletionsTool() *mcp.ServerTool {
 
 // CreateGetTypeDefinitionTool creates the get type definition MCP tool.
 func (m mcpTools) CreateGetTypeDefinitionTool() *mcp.ServerTool {
-	return mcp.NewServerTool[GetTypeDefinitionParams, GetTypeDefinitionResult](
+	return mcp.NewServerTool(
 		"get_type_definition",
 		"Navigate to the type definition of a symbol at the specified position",
 		m.HandleGetTypeDefinition,
@@ -1104,7 +1104,7 @@ func (m mcpTools) CreateGetTypeDefinitionTool() *mcp.ServerTool {
 
 // CreateFindImplementationsTool creates the find implementations MCP tool.
 func (m mcpTools) CreateFindImplementationsTool() *mcp.ServerTool {
-	return mcp.NewServerTool[FindImplementationsParams, FindImplementationsResult](
+	return mcp.NewServerTool(
 		"find_implementations",
 		"Find all implementations of an interface or method at the specified position",
 		m.HandleFindImplementations,
@@ -1119,7 +1119,7 @@ func (m mcpTools) CreateFindImplementationsTool() *mcp.ServerTool {
 
 // CreateFormatDocumentTool creates the format document MCP tool.
 func (m mcpTools) CreateFormatDocumentTool() *mcp.ServerTool {
-	return mcp.NewServerTool[FormatDocumentParams, FormatDocumentResult](
+	return mcp.NewServerTool(
 		"format_document",
 		"Format a Go source file according to gofmt standards",
 		m.HandleFormatDocument,
@@ -1132,7 +1132,7 @@ func (m mcpTools) CreateFormatDocumentTool() *mcp.ServerTool {
 
 // CreateOrganizeImportsTool creates the organize imports MCP tool.
 func (m mcpTools) CreateOrganizeImportsTool() *mcp.ServerTool {
-	return mcp.NewServerTool[OrganizeImportsParams, OrganizeImportsResult](
+	return mcp.NewServerTool(
 		"organize_imports",
 		"Organize and clean up import statements in a Go file",
 		m.HandleOrganizeImports,
@@ -1145,7 +1145,7 @@ func (m mcpTools) CreateOrganizeImportsTool() *mcp.ServerTool {
 
 // CreateGetInlayHintsTool creates the get inlay hints MCP tool.
 func (m mcpTools) CreateGetInlayHintsTool() *mcp.ServerTool {
-	return mcp.NewServerTool[GetInlayHintsParams, GetInlayHintsResult](
+	return mcp.NewServerTool(
 		"get_inlay_hints",
 		"Get inlay hints (implicit parameter names, type information) for a range in a Go file",
 		m.HandleGetInlayHints,

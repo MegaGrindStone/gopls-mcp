@@ -74,7 +74,7 @@ func TestMCPGoToDefinitionIntegration(t *testing.T) {
 		t.Fatalf("HandleGoToDefinition failed: %v", err)
 	}
 
-	defResult := parseJSONResult[GoToDefinitionResult](t, result)
+	defResult := parseJSONResult(t, result)
 
 	if len(defResult.Locations) == 0 {
 		t.Error("Expected at least one definition location")
@@ -130,7 +130,7 @@ func TestMCPFindReferencesIntegration(t *testing.T) {
 		t.Fatalf("HandleFindReferences failed: %v", err)
 	}
 
-	refResult := parseJSONResult[FindReferencesResult](t, result)
+	refResult := parseJSONResult(t, result)
 
 	if len(refResult.Locations) == 0 {
 		t.Error("Expected at least one reference location")
@@ -180,7 +180,7 @@ func TestMCPGetHoverIntegration(t *testing.T) {
 		t.Fatalf("HandleGetHover failed: %v", err)
 	}
 
-	hoverResult := parseJSONResult[GetHoverResult](t, result)
+	hoverResult := parseJSONResult(t, result)
 
 	if len(hoverResult.Contents) == 0 {
 		t.Error("Expected hover contents")
@@ -257,7 +257,7 @@ func testFunction() int {
 		t.Fatalf("HandleGetDiagnostics failed: %v", err)
 	}
 
-	diagResult := parseJSONResult[GetDiagnosticsResult](t, result)
+	diagResult := parseJSONResult(t, result)
 
 	// The error file should have diagnostics
 	if len(diagResult.Diagnostics) == 0 {
@@ -312,7 +312,7 @@ func TestMCPListWorkspacesIntegration(t *testing.T) {
 		t.Fatalf("HandleListWorkspaces failed: %v", err)
 	}
 
-	listResult := parseJSONResult[ListWorkspacesResult](t, result)
+	listResult := parseJSONResult(t, result)
 
 	if len(listResult.Workspaces) != 2 {
 		t.Errorf("Expected 2 workspaces, got %d", len(listResult.Workspaces))
@@ -367,7 +367,7 @@ func TestMCPGetDocumentSymbolsIntegration(t *testing.T) {
 		t.Fatalf("HandleGetDocumentSymbols failed: %v", err)
 	}
 
-	symbolResult := parseJSONResult[GetDocumentSymbolsResult](t, result)
+	symbolResult := parseJSONResult(t, result)
 
 	if len(symbolResult.Symbols) == 0 {
 		t.Error("Expected document symbols")
