@@ -18,22 +18,27 @@ import (
 
 // goplsClient manages a gopls subprocess and handles basic LSP communication.
 type goplsClient struct {
-	cmd                   *exec.Cmd
-	stdin                 io.WriteCloser
-	stdout                io.ReadCloser
-	stderr                io.ReadCloser
-	workspacePath         string
-	mu                    sync.RWMutex
-	running               bool
-	logger                *slog.Logger
-	requestID             int
-	requestIDMux          sync.Mutex
-	responses             map[int]chan map[string]any
-	responsesMux          sync.Mutex
-	openFiles             map[string]bool
-	openFilesMux          sync.RWMutex
-	diagnostics           map[string][]Diagnostic
+	cmd           *exec.Cmd
+	stdin         io.WriteCloser
+	stdout        io.ReadCloser
+	stderr        io.ReadCloser
+	workspacePath string
+	logger        *slog.Logger
+
+	mu      sync.RWMutex
+	running bool
+
+	requestIDMux sync.Mutex
+	requestID    int
+
+	responsesMux sync.Mutex
+	responses    map[int]chan map[string]any
+
+	openFilesMux sync.RWMutex
+	openFiles    map[string]bool
+
 	diagnosticsMux        sync.RWMutex
+	diagnostics           map[string][]Diagnostic
 	diagnosticsTimestamps map[string]time.Time
 }
 
