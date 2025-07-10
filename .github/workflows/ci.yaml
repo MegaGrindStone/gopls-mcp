@@ -1,0 +1,67 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24.4'
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Verify dependencies
+      run: go mod verify
+
+    - name: Run tests
+      run: go test ./... -v -count=1 -p 1
+
+    - name: Run go vet
+      run: go vet ./...
+
+    - name: Check formatting
+      run: |
+        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+          echo "Go code is not formatted:"
+          gofmt -s -l .
+          exit 1
+        fi
+
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v8
+      with:
+        version: v2.1
+
+    - name: Generate test summary
+      run: |
+        echo "### CI Summary :white_check_mark:" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Go Version:** \`1.24.4\`" >> $GITHUB_STEP_SUMMARY
+        echo "**Quality Gates:** All passed" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- :heavy_check_mark: Tests" >> $GITHUB_STEP_SUMMARY
+        echo "- :heavy_check_mark: Code formatting" >> $GITHUB_STEP_SUMMARY
+        echo "- :heavy_check_mark: Static analysis (go vet)" >> $GITHUB_STEP_SUMMARY
+        echo "- :heavy_check_mark: Linting (golangci-lint)" >> $GITHUB_STEP_SUMMARY
+        echo "- :heavy_check_mark: Dependencies verified" >> $GITHUB_STEP_SUMMARY
