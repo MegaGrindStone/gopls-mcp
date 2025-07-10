@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## [v0.3.0] - 2025-07-10
+
+### Added
+
 - **Multi-Workspace Support**: Full support for multiple Go workspaces with explicit workspace selection
   - **Comma-Separated Workspace Paths**: Accept multiple workspaces via `-workspace /project1,/project2,/project3`
   - **Workspace Management Tool**: New `list_workspaces` tool to discover available workspaces
