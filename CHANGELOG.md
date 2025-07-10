@@ -7,11 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.3.2] - 2025-07-10
+
 ### Fixed
 
 - **Unnecessary Type Arguments**: Removed redundant type arguments from MCP tools and test functions for cleaner Go code
 - **Diagnostic Timing Bug**: Fixed inconsistent diagnostic results on first call by preventing premature acceptance of empty diagnostics
 - **Docker "No active builds" Error**: Fixed gopls module analysis failure in Docker containers by including full Go toolchain
+
+### Improved
+
+- **Mutex Placement**: Reorganized goplsClient struct to follow mutex placement guidelines for better concurrency clarity
 
 ## [v0.3.1] - 2025-07-10
 
