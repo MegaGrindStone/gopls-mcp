@@ -312,9 +312,9 @@ func (m testMCPTools) convertLocationsToResults(locations []Location) []Location
 	for i, loc := range locations {
 		results[i] = LocationResult{
 			URI:          loc.URI,
-			Line:         loc.Range.Start.Line,
+			Line:         loc.Range.Start.Line + 1,
 			Character:    loc.Range.Start.Character,
-			EndLine:      loc.Range.End.Line,
+			EndLine:      loc.Range.End.Line + 1,
 			EndCharacter: loc.Range.End.Character,
 		}
 	}
@@ -324,9 +324,9 @@ func (m testMCPTools) convertLocationsToResults(locations []Location) []Location
 func (m testMCPTools) convertLocationToResult(location Location) LocationResult {
 	return LocationResult{
 		URI:          location.URI,
-		Line:         location.Range.Start.Line,
+		Line:         location.Range.Start.Line + 1,
 		Character:    location.Range.Start.Character,
-		EndLine:      location.Range.End.Line,
+		EndLine:      location.Range.End.Line + 1,
 		EndCharacter: location.Range.End.Character,
 	}
 }
@@ -344,16 +344,16 @@ func (m testMCPTools) convertDocumentSymbolToResult(symbol DocumentSymbol) Docum
 		Deprecated: symbol.Deprecated,
 		Range: LocationResult{
 			URI:          "",
-			Line:         symbol.Range.Start.Line,
+			Line:         symbol.Range.Start.Line + 1,
 			Character:    symbol.Range.Start.Character,
-			EndLine:      symbol.Range.End.Line,
+			EndLine:      symbol.Range.End.Line + 1,
 			EndCharacter: symbol.Range.End.Character,
 		},
 		SelectionRange: LocationResult{
 			URI:          "",
-			Line:         symbol.SelectionRange.Start.Line,
+			Line:         symbol.SelectionRange.Start.Line + 1,
 			Character:    symbol.SelectionRange.Start.Character,
-			EndLine:      symbol.SelectionRange.End.Line,
+			EndLine:      symbol.SelectionRange.End.Line + 1,
 			EndCharacter: symbol.SelectionRange.End.Character,
 		},
 		Children: children,
@@ -366,9 +366,9 @@ func (m testMCPTools) convertTextEditsToResults(textEdits []TextEdit) []TextEdit
 		results[i] = TextEditResult{
 			Range: LocationResult{
 				URI:          "",
-				Line:         edit.Range.Start.Line,
+				Line:         edit.Range.Start.Line + 1,
 				Character:    edit.Range.Start.Character,
-				EndLine:      edit.Range.End.Line,
+				EndLine:      edit.Range.End.Line + 1,
 				EndCharacter: edit.Range.End.Character,
 			},
 			NewText: edit.NewText,
@@ -383,9 +383,9 @@ func (m testMCPTools) convertInlayHintsToResults(inlayHints []InlayHint) []Inlay
 		results[i] = InlayHintResult{
 			Position: LocationResult{
 				URI:          "",
-				Line:         hint.Position.Line,
+				Line:         hint.Position.Line + 1,
 				Character:    hint.Position.Character,
-				EndLine:      hint.Position.Line,
+				EndLine:      hint.Position.Line + 1,
 				EndCharacter: hint.Position.Character,
 			},
 			Label:   hint.Label,
@@ -490,14 +490,14 @@ func TestConvertLocationsToResults(t *testing.T) {
 	if results[0].URI != "test.go" {
 		t.Errorf("Expected URI 'test.go', got '%s'", results[0].URI)
 	}
-	if results[0].Line != 10 {
-		t.Errorf("Expected line 10, got %d", results[0].Line)
+	if results[0].Line != 11 {
+		t.Errorf("Expected line 11, got %d", results[0].Line)
 	}
 	if results[0].Character != 5 {
 		t.Errorf("Expected character 5, got %d", results[0].Character)
 	}
-	if results[0].EndLine != 10 {
-		t.Errorf("Expected end line 10, got %d", results[0].EndLine)
+	if results[0].EndLine != 11 {
+		t.Errorf("Expected end line 11, got %d", results[0].EndLine)
 	}
 	if results[0].EndCharacter != 15 {
 		t.Errorf("Expected end character 15, got %d", results[0].EndCharacter)
@@ -520,14 +520,14 @@ func TestConvertLocationToResult(t *testing.T) {
 	if result.URI != "test.go" {
 		t.Errorf("Expected URI 'test.go', got '%s'", result.URI)
 	}
-	if result.Line != 5 {
-		t.Errorf("Expected line 5, got %d", result.Line)
+	if result.Line != 6 {
+		t.Errorf("Expected line 6, got %d", result.Line)
 	}
 	if result.Character != 10 {
 		t.Errorf("Expected character 10, got %d", result.Character)
 	}
-	if result.EndLine != 5 {
-		t.Errorf("Expected end line 5, got %d", result.EndLine)
+	if result.EndLine != 6 {
+		t.Errorf("Expected end line 6, got %d", result.EndLine)
 	}
 	if result.EndCharacter != 20 {
 		t.Errorf("Expected end character 20, got %d", result.EndCharacter)
@@ -576,8 +576,8 @@ func TestConvertDocumentSymbolToResult(t *testing.T) {
 	if result.Kind != 12 {
 		t.Errorf("Expected kind 12, got %d", result.Kind)
 	}
-	if result.Range.Line != 10 {
-		t.Errorf("Expected range line 10, got %d", result.Range.Line)
+	if result.Range.Line != 11 {
+		t.Errorf("Expected range line 11, got %d", result.Range.Line)
 	}
 
 	// Test children conversion
@@ -618,8 +618,8 @@ func TestConvertTextEditsToResults(t *testing.T) {
 	if results[0].NewText != "new text" {
 		t.Errorf("Expected new text 'new text', got '%s'", results[0].NewText)
 	}
-	if results[0].Range.Line != 0 {
-		t.Errorf("Expected line 0, got %d", results[0].Range.Line)
+	if results[0].Range.Line != 1 {
+		t.Errorf("Expected line 1, got %d", results[0].Range.Line)
 	}
 	if results[1].NewText != "other text" {
 		t.Errorf("Expected new text 'other text', got '%s'", results[1].NewText)
@@ -658,8 +658,8 @@ func TestConvertInlayHintsToResults(t *testing.T) {
 	if results[0].Tooltip != "Type hint" {
 		t.Errorf("Expected tooltip 'Type hint', got '%s'", results[0].Tooltip)
 	}
-	if results[0].Position.Line != 10 {
-		t.Errorf("Expected position line 10, got %d", results[0].Position.Line)
+	if results[0].Position.Line != 11 {
+		t.Errorf("Expected position line 11, got %d", results[0].Position.Line)
 	}
 }
 

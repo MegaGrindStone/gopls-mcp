@@ -6,10 +6,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a Go project for implementing a Model Context Protocol (MCP) server for gopls (Go language server). The server supports both HTTP and stdio transports to provide Go language server capabilities to MCP clients like Claude with full multi-workspace support.
 
-## 🚨 MANDATORY Go Coding Guidelines
-
-**CRITICAL**: ALL Go coding patterns from `~/.claude/CLAUDE.md` are equally mandatory for this project - no exceptions.
-
 ### Key Reminder
 
 This project requires strict adherence to ALL guidelines including:
@@ -24,34 +20,6 @@ This project requires strict adherence to ALL guidelines including:
 **📖 Complete Guidelines**: See `~/.claude/CLAUDE.md` for full Go development guidelines.
 
 ## Development Commands
-
-### Standard Go Commands
-
-```bash
-# Run the application
-go run main.go
-
-# Build the application
-go build -o gopls-mcp
-
-# Run tests
-go test ./...
-
-# Run tests with verbose output and no caching
-go test ./... -v -count=1 -p 1
-
-# Format code
-go fmt ./...
-
-# Vet code for issues
-go vet ./...
-
-# Tidy dependencies
-go mod tidy
-
-# Run linter (if golangci-lint is installed)
-golangci-lint run ./...
-```
 
 ### Docker Commands
 

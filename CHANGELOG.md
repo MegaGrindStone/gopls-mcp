@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING**: Line numbering converted from 0-based to 1-based for all MCP tools to eliminate AI assistant off-by-one errors
+
 ## [v0.3.2] - 2025-07-10
 
 ### Fixed

@@ -64,7 +64,7 @@ func TestMCPGoToDefinitionIntegration(t *testing.T) {
 		Arguments: GoToDefinitionParams{
 			Workspace: workspacePath,
 			Path:      "main.go",
-			Line:      6,  // testFunction call line
+			Line:      7,  // testFunction call line (1-based)
 			Character: 11, // testFunction position
 		},
 	}
@@ -119,7 +119,7 @@ func TestMCPFindReferencesIntegration(t *testing.T) {
 		Arguments: FindReferencesParams{
 			Workspace:          workspacePath,
 			Path:               "main.go",
-			Line:               11, // testFunction definition line
+			Line:               12, // testFunction definition line (1-based)
 			Character:          5,  // testFunction name position
 			IncludeDeclaration: true,
 		},
@@ -170,7 +170,7 @@ func TestMCPGetHoverIntegration(t *testing.T) {
 		Arguments: GetHoverParams{
 			Workspace: workspacePath,
 			Path:      "main.go",
-			Line:      6,  // testFunction call line
+			Line:      7,  // testFunction call line (1-based)
 			Character: 11, // testFunction position
 		},
 	}

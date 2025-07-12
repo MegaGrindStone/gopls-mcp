@@ -273,6 +273,21 @@ type ListWorkspacesResult struct {
 	Workspaces []WorkspaceInfo `json:"workspaces"`
 }
 
+// Line number conversion functions for MCP layer (1-based) to LSP layer (0-based)
+
+// convertLineToLSP converts a 1-based line number from MCP to 0-based for LSP.
+func convertLineToLSP(line int) int {
+	if line <= 0 {
+		return 0
+	}
+	return line - 1
+}
+
+// convertLineFromLSP converts a 0-based line number from LSP to 1-based for MCP.
+func convertLineFromLSP(line int) int {
+	return line + 1
+}
+
 // mcpTools wraps multiple goplsClients to provide MCP tool functionality.
 type mcpTools struct {
 	clients map[string]*goplsClient
@@ -303,9 +318,9 @@ func (m mcpTools) convertLocationsToResults(locations []Location) []LocationResu
 	for i, loc := range locations {
 		results[i] = LocationResult{
 			URI:          loc.URI,
-			Line:         loc.Range.Start.Line,
+			Line:         convertLineFromLSP(loc.Range.Start.Line),
 			Character:    loc.Range.Start.Character,
-			EndLine:      loc.Range.End.Line,
+			EndLine:      convertLineFromLSP(loc.Range.End.Line),
 			EndCharacter: loc.Range.End.Character,
 		}
 	}
@@ -316,16 +331,14 @@ func (m mcpTools) convertLocationsToResults(locations []Location) []LocationResu
 func (m mcpTools) convertLocationToResult(location Location) LocationResult {
 	return LocationResult{
 		URI:          location.URI,
-		Line:         location.Range.Start.Line,
+		Line:         convertLineFromLSP(location.Range.Start.Line),
 		Character:    location.Range.Start.Character,
-		EndLine:      location.Range.End.Line,
+		EndLine:      convertLineFromLSP(location.Range.End.Line),
 		EndCharacter: location.Range.End.Character,
 	}
 }
 
 // convertDocumentSymbolToResult converts a DocumentSymbol struct to DocumentSymbolResult struct.
-//
-//nolint:dupl // Intentional duplication with test version for isolation
 func (m mcpTools) convertDocumentSymbolToResult(symbol DocumentSymbol) DocumentSymbolResult {
 	children := make([]DocumentSymbolResult, len(symbol.Children))
 	for i, child := range symbol.Children {
@@ -339,16 +352,16 @@ func (m mcpTools) convertDocumentSymbolToResult(symbol DocumentSymbol) DocumentS
 		Deprecated: symbol.Deprecated,
 		Range: LocationResult{
 			URI:          "",
-			Line:         symbol.Range.Start.Line,
+			Line:         convertLineFromLSP(symbol.Range.Start.Line),
 			Character:    symbol.Range.Start.Character,
-			EndLine:      symbol.Range.End.Line,
+			EndLine:      convertLineFromLSP(symbol.Range.End.Line),
 			EndCharacter: symbol.Range.End.Character,
 		},
 		SelectionRange: LocationResult{
 			URI:          "",
-			Line:         symbol.SelectionRange.Start.Line,
+			Line:         convertLineFromLSP(symbol.SelectionRange.Start.Line),
 			Character:    symbol.SelectionRange.Start.Character,
-			EndLine:      symbol.SelectionRange.End.Line,
+			EndLine:      convertLineFromLSP(symbol.SelectionRange.End.Line),
 			EndCharacter: symbol.SelectionRange.End.Character,
 		},
 		Children: children,
@@ -362,9 +375,9 @@ func (m mcpTools) convertTextEditsToResults(textEdits []TextEdit) []TextEditResu
 		results[i] = TextEditResult{
 			Range: LocationResult{
 				URI:          "",
-				Line:         edit.Range.Start.Line,
+				Line:         convertLineFromLSP(edit.Range.Start.Line),
 				Character:    edit.Range.Start.Character,
-				EndLine:      edit.Range.End.Line,
+				EndLine:      convertLineFromLSP(edit.Range.End.Line),
 				EndCharacter: edit.Range.End.Character,
 			},
 			NewText: edit.NewText,
@@ -380,9 +393,9 @@ func (m mcpTools) convertInlayHintsToResults(inlayHints []InlayHint) []InlayHint
 		results[i] = InlayHintResult{
 			Position: LocationResult{
 				URI:          "",
-				Line:         hint.Position.Line,
+				Line:         convertLineFromLSP(hint.Position.Line),
 				Character:    hint.Position.Character,
-				EndLine:      hint.Position.Line,
+				EndLine:      convertLineFromLSP(hint.Position.Line),
 				EndCharacter: hint.Position.Character,
 			},
 			Label:   hint.Label,
@@ -440,7 +453,11 @@ func (m mcpTools) HandleGoToDefinition(
 		return nil, err
 	}
 
-	locations, err := client.goToDefinition(params.Arguments.Path, params.Arguments.Line, params.Arguments.Character)
+	locations, err := client.goToDefinition(
+		params.Arguments.Path,
+		convertLineToLSP(params.Arguments.Line),
+		params.Arguments.Character,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get definition: %w", err)
 	}
@@ -476,7 +493,7 @@ func (m mcpTools) HandleFindReferences(
 
 	locations, err := client.findReferences(
 		params.Arguments.Path,
-		params.Arguments.Line,
+		convertLineToLSP(params.Arguments.Line),
 		params.Arguments.Character,
 		params.Arguments.IncludeDeclaration,
 	)
@@ -513,7 +530,11 @@ func (m mcpTools) HandleGetHover(
 		return nil, err
 	}
 
-	hover, err := client.getHover(params.Arguments.Path, params.Arguments.Line, params.Arguments.Character)
+	hover, err := client.getHover(
+		params.Arguments.Path,
+		convertLineToLSP(params.Arguments.Line),
+		params.Arguments.Character,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get hover info: %w", err)
 	}
@@ -526,9 +547,9 @@ func (m mcpTools) HandleGetHover(
 	if hover.Range != nil {
 		result.Range = &LocationResult{
 			URI:          params.Arguments.Path,
-			Line:         hover.Range.Start.Line,
+			Line:         convertLineFromLSP(hover.Range.Start.Line),
 			Character:    hover.Range.Start.Character,
-			EndLine:      hover.Range.End.Line,
+			EndLine:      convertLineFromLSP(hover.Range.End.Line),
 			EndCharacter: hover.Range.End.Character,
 		}
 	}
@@ -569,9 +590,9 @@ func (m mcpTools) HandleGetDiagnostics(
 		diagResults[i] = DiagnosticResult{
 			Range: LocationResult{
 				URI:          params.Arguments.Path,
-				Line:         diag.Range.Start.Line,
+				Line:         convertLineFromLSP(diag.Range.Start.Line),
 				Character:    diag.Range.Start.Character,
-				EndLine:      diag.Range.End.Line,
+				EndLine:      convertLineFromLSP(diag.Range.End.Line),
 				EndCharacter: diag.Range.End.Character,
 			},
 			Severity: int(diag.Severity),
@@ -697,7 +718,7 @@ func (m mcpTools) HandleGetSignatureHelp(
 	}
 
 	signatureHelp, err := client.getSignatureHelp(
-		params.Arguments.Path, params.Arguments.Line, params.Arguments.Character)
+		params.Arguments.Path, convertLineToLSP(params.Arguments.Line), params.Arguments.Character)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get signature help: %w", err)
 	}
@@ -747,7 +768,11 @@ func (m mcpTools) HandleGetCompletions(
 		return nil, err
 	}
 
-	completions, err := client.getCompletions(params.Arguments.Path, params.Arguments.Line, params.Arguments.Character)
+	completions, err := client.getCompletions(
+		params.Arguments.Path,
+		convertLineToLSP(params.Arguments.Line),
+		params.Arguments.Character,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get completions: %w", err)
 	}
@@ -790,7 +815,11 @@ func (m mcpTools) HandleGetTypeDefinition(
 		return nil, err
 	}
 
-	locations, err := client.getTypeDefinition(params.Arguments.Path, params.Arguments.Line, params.Arguments.Character)
+	locations, err := client.getTypeDefinition(
+		params.Arguments.Path,
+		convertLineToLSP(params.Arguments.Line),
+		params.Arguments.Character,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get type definition: %w", err)
 	}
@@ -827,7 +856,7 @@ func (m mcpTools) HandleFindImplementations(
 	}
 
 	locations, err := client.findImplementations(
-		params.Arguments.Path, params.Arguments.Line, params.Arguments.Character)
+		params.Arguments.Path, convertLineToLSP(params.Arguments.Line), params.Arguments.Character)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find implementations: %w", err)
 	}
@@ -931,9 +960,9 @@ func (m mcpTools) HandleGetInlayHints(
 
 	inlayHints, err := client.getInlayHints(
 		params.Arguments.Path,
-		params.Arguments.StartLine,
+		convertLineToLSP(params.Arguments.StartLine),
 		params.Arguments.StartChar,
-		params.Arguments.EndLine,
+		convertLineToLSP(params.Arguments.EndLine),
 		params.Arguments.EndChar,
 	)
 	if err != nil {
@@ -979,7 +1008,7 @@ func (m mcpTools) CreateGoToDefinitionTool() *mcp.ServerTool {
 		mcp.Input(
 			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
 			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
-			mcp.Property("line", mcp.Description("Line number (0-based)"), mcp.Required(true)),
+			mcp.Property("line", mcp.Description("Line number (1-based)"), mcp.Required(true)),
 			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
 		),
 	)
@@ -994,7 +1023,7 @@ func (m mcpTools) CreateFindReferencesTool() *mcp.ServerTool {
 		mcp.Input(
 			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
 			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
-			mcp.Property("line", mcp.Description("Line number (0-based)"), mcp.Required(true)),
+			mcp.Property("line", mcp.Description("Line number (1-based)"), mcp.Required(true)),
 			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
 			mcp.Property("includeDeclaration", mcp.Description("Include declaration in results"), mcp.Required(false)),
 		),
@@ -1010,7 +1039,7 @@ func (m mcpTools) CreateGetHoverTool() *mcp.ServerTool {
 		mcp.Input(
 			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
 			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
-			mcp.Property("line", mcp.Description("Line number (0-based)"), mcp.Required(true)),
+			mcp.Property("line", mcp.Description("Line number (1-based)"), mcp.Required(true)),
 			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
 		),
 	)
@@ -1066,7 +1095,7 @@ func (m mcpTools) CreateGetSignatureHelpTool() *mcp.ServerTool {
 		mcp.Input(
 			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
 			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
-			mcp.Property("line", mcp.Description("Line number (0-based)"), mcp.Required(true)),
+			mcp.Property("line", mcp.Description("Line number (1-based)"), mcp.Required(true)),
 			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
 		),
 	)
@@ -1081,7 +1110,7 @@ func (m mcpTools) CreateGetCompletionsTool() *mcp.ServerTool {
 		mcp.Input(
 			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
 			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
-			mcp.Property("line", mcp.Description("Line number (0-based)"), mcp.Required(true)),
+			mcp.Property("line", mcp.Description("Line number (1-based)"), mcp.Required(true)),
 			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
 		),
 	)
@@ -1096,7 +1125,7 @@ func (m mcpTools) CreateGetTypeDefinitionTool() *mcp.ServerTool {
 		mcp.Input(
 			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
 			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
-			mcp.Property("line", mcp.Description("Line number (0-based)"), mcp.Required(true)),
+			mcp.Property("line", mcp.Description("Line number (1-based)"), mcp.Required(true)),
 			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
 		),
 	)
@@ -1111,7 +1140,7 @@ func (m mcpTools) CreateFindImplementationsTool() *mcp.ServerTool {
 		mcp.Input(
 			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
 			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
-			mcp.Property("line", mcp.Description("Line number (0-based)"), mcp.Required(true)),
+			mcp.Property("line", mcp.Description("Line number (1-based)"), mcp.Required(true)),
 			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
 		),
 	)
@@ -1152,9 +1181,9 @@ func (m mcpTools) CreateGetInlayHintsTool() *mcp.ServerTool {
 		mcp.Input(
 			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
 			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
-			mcp.Property("startLine", mcp.Description("Start line number (0-based)"), mcp.Required(true)),
+			mcp.Property("startLine", mcp.Description("Start line number (1-based)"), mcp.Required(true)),
 			mcp.Property("startChar", mcp.Description("Start character position (0-based)"), mcp.Required(true)),
-			mcp.Property("endLine", mcp.Description("End line number (0-based)"), mcp.Required(true)),
+			mcp.Property("endLine", mcp.Description("End line number (1-based)"), mcp.Required(true)),
 			mcp.Property("endChar", mcp.Description("End character position (0-based)"), mcp.Required(true)),
 		),
 	)

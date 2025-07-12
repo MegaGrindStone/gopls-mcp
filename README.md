@@ -457,7 +457,7 @@ Navigate to symbol definitions in your Go workspace.
 
 - `workspace` (string): Workspace path to use for this request
 - `path` (string): Relative path to Go file (e.g., `main.go`, `pkg/client.go`)
-- `line` (number): Line number (0-based)
+- `line` (number): Line number (1-based)
 - `character` (number): Character position (0-based)
 
 **Example:**
@@ -482,7 +482,7 @@ Find all references to a symbol across your Go workspace.
 
 - `workspace` (string): Workspace path to use for this request
 - `path` (string): Relative path to Go file
-- `line` (number): Line number (0-based)
+- `line` (number): Line number (1-based)
 - `character` (number): Character position (0-based)
 - `includeDeclaration` (boolean): Include the declaration in results
 
@@ -509,7 +509,7 @@ Get documentation and type information for symbols.
 
 - `workspace` (string): Workspace path to use for this request
 - `path` (string): Relative path to Go file
-- `line` (number): Line number (0-based)
+- `line` (number): Line number (1-based)
 - `character` (number): Character position (0-based)
 
 **Example:**
@@ -601,7 +601,7 @@ Get function signature help (parameter information) at the specified position.
 
 - `workspace` (string): Workspace path to use for this request
 - `path` (string): Relative path to Go file
-- `line` (number): Line number (0-based)
+- `line` (number): Line number (1-based)
 - `character` (number): Character position (0-based)
 
 **Example:**
@@ -626,7 +626,7 @@ Get code completion suggestions at the specified position.
 
 - `workspace` (string): Workspace path to use for this request
 - `path` (string): Relative path to Go file
-- `line` (number): Line number (0-based)
+- `line` (number): Line number (1-based)
 - `character` (number): Character position (0-based)
 
 **Example:**
@@ -653,7 +653,7 @@ Navigate to the type definition of a symbol at the specified position.
 
 - `workspace` (string): Workspace path to use for this request
 - `path` (string): Relative path to Go file
-- `line` (number): Line number (0-based)
+- `line` (number): Line number (1-based)
 - `character` (number): Character position (0-based)
 
 **Example:**
@@ -678,7 +678,7 @@ Find all implementations of an interface or method at the specified position.
 
 - `workspace` (string): Workspace path to use for this request
 - `path` (string): Relative path to Go file
-- `line` (number): Line number (0-based)
+- `line` (number): Line number (1-based)
 - `character` (number): Character position (0-based)
 
 **Example:**
@@ -747,9 +747,9 @@ Get inlay hints (implicit parameter names, type information) for a range in a Go
 
 - `workspace` (string): Workspace path to use for this request
 - `path` (string): Relative path to Go file
-- `startLine` (number): Start line number (0-based)
+- `startLine` (number): Start line number (1-based)
 - `startChar` (number): Start character position (0-based)
-- `endLine` (number): End line number (0-based)
+- `endLine` (number): End line number (1-based)
 - `endChar` (number): End character position (0-based)
 
 **Example:**
