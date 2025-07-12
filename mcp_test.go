@@ -332,9 +332,13 @@ func (m testMCPTools) convertLocationToResult(location Location) LocationResult 
 }
 
 func (m testMCPTools) convertDocumentSymbolToResult(symbol DocumentSymbol) DocumentSymbolResult {
-	children := make([]DocumentSymbolResult, len(symbol.Children))
-	for i, child := range symbol.Children {
-		children[i] = m.convertDocumentSymbolToResult(child)
+	var children any
+	if len(symbol.Children) > 0 {
+		childResults := make([]DocumentSymbolResult, len(symbol.Children))
+		for i, child := range symbol.Children {
+			childResults[i] = m.convertDocumentSymbolToResult(child)
+		}
+		children = childResults
 	}
 
 	return DocumentSymbolResult{
@@ -581,11 +585,24 @@ func TestConvertDocumentSymbolToResult(t *testing.T) {
 	}
 
 	// Test children conversion
-	if len(result.Children) != 1 {
-		t.Errorf("Expected 1 child, got %d", len(result.Children))
+	if result.Children == nil {
+		t.Error("Expected children to not be nil")
+		return
 	}
-	if result.Children[0].Name != "ChildSymbol" {
-		t.Errorf("Expected child name 'ChildSymbol', got '%s'", result.Children[0].Name)
+
+	children, ok := result.Children.([]DocumentSymbolResult)
+	if !ok {
+		t.Error("Expected children to be []DocumentSymbolResult")
+		return
+	}
+
+	if len(children) != 1 {
+		t.Errorf("Expected 1 child, got %d", len(children))
+		return
+	}
+
+	if children[0].Name != "ChildSymbol" {
+		t.Errorf("Expected child name 'ChildSymbol', got '%s'", children[0].Name)
 	}
 }
 

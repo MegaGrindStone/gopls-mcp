@@ -13,99 +13,99 @@ import (
 
 // GoToDefinitionParams represents parameters for go to definition requests.
 type GoToDefinitionParams struct {
-	Workspace string `json:"workspace"`
-	Path      string `json:"path"`
-	Line      int    `json:"line"`
-	Character int    `json:"character"`
+	Workspace string `json:"workspace" mcp:"Workspace path to use for this request"`
+	Path      string `json:"path" mcp:"Relative path to Go file (e.g., main.go, pkg/client.go)"`
+	Line      int    `json:"line" mcp:"Line number (1-based)"`
+	Character int    `json:"character" mcp:"Character position (0-based)"`
 }
 
 // FindReferencesParams represents parameters for find references requests.
 type FindReferencesParams struct {
-	Workspace          string `json:"workspace"`
-	Path               string `json:"path"`
-	Line               int    `json:"line"`
-	Character          int    `json:"character"`
-	IncludeDeclaration bool   `json:"includeDeclaration"`
+	Workspace          string `json:"workspace" mcp:"Workspace path to use for this request"`
+	Path               string `json:"path" mcp:"Relative path to Go file (e.g., main.go, pkg/client.go)"`
+	Line               int    `json:"line" mcp:"Line number (1-based)"`
+	Character          int    `json:"character" mcp:"Character position (0-based)"`
+	IncludeDeclaration bool   `json:"includeDeclaration" mcp:"Include declaration in results"`
 }
 
 // GetHoverParams represents parameters for get hover info requests.
 type GetHoverParams struct {
-	Workspace string `json:"workspace"`
-	Path      string `json:"path"`
-	Line      int    `json:"line"`
-	Character int    `json:"character"`
+	Workspace string `json:"workspace" mcp:"Workspace path to use for this request"`
+	Path      string `json:"path" mcp:"Relative path to Go file (e.g., main.go, pkg/client.go)"`
+	Line      int    `json:"line" mcp:"Line number (1-based)"`
+	Character int    `json:"character" mcp:"Character position (0-based)"`
 }
 
 // GetDiagnosticsParams represents parameters for get diagnostics requests.
 type GetDiagnosticsParams struct {
-	Workspace string `json:"workspace"`
-	Path      string `json:"path"`
+	Workspace string `json:"workspace" mcp:"Workspace path to use for this request"`
+	Path      string `json:"path" mcp:"Relative path to Go file (e.g., main.go, pkg/client.go)"`
 }
 
 // GetDocumentSymbolsParams represents parameters for get document symbols requests.
 type GetDocumentSymbolsParams struct {
-	Workspace string `json:"workspace"`
-	Path      string `json:"path"`
+	Workspace string `json:"workspace" mcp:"Workspace path to use for this request"`
+	Path      string `json:"path" mcp:"Relative path to Go file (e.g., main.go, pkg/client.go)"`
 }
 
 // GetWorkspaceSymbolsParams represents parameters for get workspace symbols requests.
 type GetWorkspaceSymbolsParams struct {
-	Workspace string `json:"workspace"`
-	Query     string `json:"query"`
+	Workspace string `json:"workspace" mcp:"Workspace path to use for this request"`
+	Query     string `json:"query" mcp:"Search query for symbol names (supports fuzzy matching)"`
 }
 
 // GetSignatureHelpParams represents parameters for get signature help requests.
 type GetSignatureHelpParams struct {
-	Workspace string `json:"workspace"`
-	Path      string `json:"path"`
-	Line      int    `json:"line"`
-	Character int    `json:"character"`
+	Workspace string `json:"workspace" mcp:"Workspace path to use for this request"`
+	Path      string `json:"path" mcp:"Relative path to Go file (e.g., main.go, pkg/client.go)"`
+	Line      int    `json:"line" mcp:"Line number (1-based)"`
+	Character int    `json:"character" mcp:"Character position (0-based)"`
 }
 
 // GetCompletionsParams represents parameters for get completions requests.
 type GetCompletionsParams struct {
-	Workspace string `json:"workspace"`
-	Path      string `json:"path"`
-	Line      int    `json:"line"`
-	Character int    `json:"character"`
+	Workspace string `json:"workspace" mcp:"Workspace path to use for this request"`
+	Path      string `json:"path" mcp:"Relative path to Go file (e.g., main.go, pkg/client.go)"`
+	Line      int    `json:"line" mcp:"Line number (1-based)"`
+	Character int    `json:"character" mcp:"Character position (0-based)"`
 }
 
 // GetTypeDefinitionParams represents parameters for get type definition requests.
 type GetTypeDefinitionParams struct {
-	Workspace string `json:"workspace"`
-	Path      string `json:"path"`
-	Line      int    `json:"line"`
-	Character int    `json:"character"`
+	Workspace string `json:"workspace" mcp:"Workspace path to use for this request"`
+	Path      string `json:"path" mcp:"Relative path to Go file (e.g., main.go, pkg/client.go)"`
+	Line      int    `json:"line" mcp:"Line number (1-based)"`
+	Character int    `json:"character" mcp:"Character position (0-based)"`
 }
 
 // FindImplementationsParams represents parameters for find implementations requests.
 type FindImplementationsParams struct {
-	Workspace string `json:"workspace"`
-	Path      string `json:"path"`
-	Line      int    `json:"line"`
-	Character int    `json:"character"`
+	Workspace string `json:"workspace" mcp:"Workspace path to use for this request"`
+	Path      string `json:"path" mcp:"Relative path to Go file (e.g., main.go, pkg/client.go)"`
+	Line      int    `json:"line" mcp:"Line number (1-based)"`
+	Character int    `json:"character" mcp:"Character position (0-based)"`
 }
 
 // FormatDocumentParams represents parameters for format document requests.
 type FormatDocumentParams struct {
-	Workspace string `json:"workspace"`
-	Path      string `json:"path"`
+	Workspace string `json:"workspace" mcp:"Workspace path to use for this request"`
+	Path      string `json:"path" mcp:"Relative path to Go file (e.g., main.go, pkg/client.go)"`
 }
 
 // OrganizeImportsParams represents parameters for organize imports requests.
 type OrganizeImportsParams struct {
-	Workspace string `json:"workspace"`
-	Path      string `json:"path"`
+	Workspace string `json:"workspace" mcp:"Workspace path to use for this request"`
+	Path      string `json:"path" mcp:"Relative path to Go file (e.g., main.go, pkg/client.go)"`
 }
 
 // GetInlayHintsParams represents parameters for get inlay hints requests.
 type GetInlayHintsParams struct {
-	Workspace string `json:"workspace"`
-	Path      string `json:"path"`
-	StartLine int    `json:"startLine"`
-	StartChar int    `json:"startChar"`
-	EndLine   int    `json:"endLine"`
-	EndChar   int    `json:"endChar"`
+	Workspace string `json:"workspace" mcp:"Workspace path to use for this request"`
+	Path      string `json:"path" mcp:"Relative path to Go file (e.g., main.go, pkg/client.go)"`
+	StartLine int    `json:"startLine" mcp:"Start line number (1-based)"`
+	StartChar int    `json:"startChar" mcp:"Start character position (0-based)"`
+	EndLine   int    `json:"endLine" mcp:"End line number (1-based)"`
+	EndChar   int    `json:"endChar" mcp:"End character position (0-based)"`
 }
 
 // ListWorkspacesParams represents parameters for list workspaces requests.
@@ -157,13 +157,13 @@ type GetDiagnosticsResult struct {
 
 // DocumentSymbolResult represents a document symbol result.
 type DocumentSymbolResult struct {
-	Name           string                 `json:"name"`
-	Detail         string                 `json:"detail,omitempty"`
-	Kind           int                    `json:"kind"`
-	Deprecated     bool                   `json:"deprecated,omitempty"`
-	Range          LocationResult         `json:"range"`
-	SelectionRange LocationResult         `json:"selectionRange"`
-	Children       []DocumentSymbolResult `json:"children,omitempty"`
+	Name           string         `json:"name"`
+	Detail         string         `json:"detail,omitempty"`
+	Kind           int            `json:"kind"`
+	Deprecated     bool           `json:"deprecated,omitempty"`
+	Range          LocationResult `json:"range"`
+	SelectionRange LocationResult `json:"selectionRange"`
+	Children       any            `json:"children,omitempty"`
 }
 
 // GetDocumentSymbolsResult represents the result of a get document symbols request.
@@ -340,9 +340,13 @@ func (m mcpTools) convertLocationToResult(location Location) LocationResult {
 
 // convertDocumentSymbolToResult converts a DocumentSymbol struct to DocumentSymbolResult struct.
 func (m mcpTools) convertDocumentSymbolToResult(symbol DocumentSymbol) DocumentSymbolResult {
-	children := make([]DocumentSymbolResult, len(symbol.Children))
-	for i, child := range symbol.Children {
-		children[i] = m.convertDocumentSymbolToResult(child)
+	var children any
+	if len(symbol.Children) > 0 {
+		childResults := make([]DocumentSymbolResult, len(symbol.Children))
+		for i, child := range symbol.Children {
+			childResults[i] = m.convertDocumentSymbolToResult(child)
+		}
+		children = childResults
 	}
 
 	return DocumentSymbolResult{
@@ -987,244 +991,110 @@ func (m mcpTools) HandleGetInlayHints(
 	}, nil
 }
 
-// MCP tool creation methods
-
-// CreateListWorkspacesTool creates the list workspaces MCP tool.
-func (m mcpTools) CreateListWorkspacesTool() *mcp.ServerTool {
-	return mcp.NewServerTool(
-		"list_workspaces",
-		"List all available Go workspaces configured in the server",
-		m.HandleListWorkspaces,
-		mcp.Input(),
-	)
-}
-
-// CreateGoToDefinitionTool creates the go to definition MCP tool.
-func (m mcpTools) CreateGoToDefinitionTool() *mcp.ServerTool {
-	return mcp.NewServerTool(
-		"go_to_definition",
-		"Navigate to the definition of a symbol at the specified position in a Go file",
-		m.HandleGoToDefinition,
-		mcp.Input(
-			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
-			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
-			mcp.Property("line", mcp.Description("Line number (1-based)"), mcp.Required(true)),
-			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
-		),
-	)
-}
-
-// CreateFindReferencesTool creates the find references MCP tool.
-func (m mcpTools) CreateFindReferencesTool() *mcp.ServerTool {
-	return mcp.NewServerTool(
-		"find_references",
-		"Find all references to a symbol at the specified position in a Go file",
-		m.HandleFindReferences,
-		mcp.Input(
-			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
-			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
-			mcp.Property("line", mcp.Description("Line number (1-based)"), mcp.Required(true)),
-			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
-			mcp.Property("includeDeclaration", mcp.Description("Include declaration in results"), mcp.Required(false)),
-		),
-	)
-}
-
-// CreateGetHoverTool creates the get hover info MCP tool.
-func (m mcpTools) CreateGetHoverTool() *mcp.ServerTool {
-	return mcp.NewServerTool(
-		"get_hover_info",
-		"Get hover information (documentation, type info) for a symbol at the specified position",
-		m.HandleGetHover,
-		mcp.Input(
-			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
-			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
-			mcp.Property("line", mcp.Description("Line number (1-based)"), mcp.Required(true)),
-			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
-		),
-	)
-}
-
-// CreateGetDiagnosticsTool creates the get diagnostics MCP tool.
-func (m mcpTools) CreateGetDiagnosticsTool() *mcp.ServerTool {
-	return mcp.NewServerTool(
-		"get_diagnostics",
-		"Get compilation errors, warnings, and other diagnostics for a Go file",
-		m.HandleGetDiagnostics,
-		mcp.Input(
-			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
-			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
-		),
-	)
-}
-
-// CreateGetDocumentSymbolsTool creates the get document symbols MCP tool.
-func (m mcpTools) CreateGetDocumentSymbolsTool() *mcp.ServerTool {
-	return mcp.NewServerTool(
-		"get_document_symbols",
-		"Get outline of symbols (functions, types, etc.) defined in a Go file",
-		m.HandleGetDocumentSymbols,
-		mcp.Input(
-			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
-			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
-		),
-	)
-}
-
-// CreateGetWorkspaceSymbolsTool creates the get workspace symbols MCP tool.
-func (m mcpTools) CreateGetWorkspaceSymbolsTool() *mcp.ServerTool {
-	return mcp.NewServerTool(
-		"get_workspace_symbols",
-		"Search for symbols across the entire Go workspace/project",
-		m.HandleGetWorkspaceSymbols,
-		mcp.Input(
-			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
-			mcp.Property("query",
-				mcp.Description("Search query for symbol names (supports fuzzy matching)"),
-				mcp.Required(true)),
-		),
-	)
-}
-
-// CreateGetSignatureHelpTool creates the get signature help MCP tool.
-func (m mcpTools) CreateGetSignatureHelpTool() *mcp.ServerTool {
-	return mcp.NewServerTool(
-		"get_signature_help",
-		"Get function signature help (parameter information) at the specified position",
-		m.HandleGetSignatureHelp,
-		mcp.Input(
-			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
-			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
-			mcp.Property("line", mcp.Description("Line number (1-based)"), mcp.Required(true)),
-			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
-		),
-	)
-}
-
-// CreateGetCompletionsTool creates the get completions MCP tool.
-func (m mcpTools) CreateGetCompletionsTool() *mcp.ServerTool {
-	return mcp.NewServerTool(
-		"get_completions",
-		"Get code completion suggestions at the specified position",
-		m.HandleGetCompletions,
-		mcp.Input(
-			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
-			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
-			mcp.Property("line", mcp.Description("Line number (1-based)"), mcp.Required(true)),
-			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
-		),
-	)
-}
-
-// CreateGetTypeDefinitionTool creates the get type definition MCP tool.
-func (m mcpTools) CreateGetTypeDefinitionTool() *mcp.ServerTool {
-	return mcp.NewServerTool(
-		"get_type_definition",
-		"Navigate to the type definition of a symbol at the specified position",
-		m.HandleGetTypeDefinition,
-		mcp.Input(
-			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
-			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
-			mcp.Property("line", mcp.Description("Line number (1-based)"), mcp.Required(true)),
-			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
-		),
-	)
-}
-
-// CreateFindImplementationsTool creates the find implementations MCP tool.
-func (m mcpTools) CreateFindImplementationsTool() *mcp.ServerTool {
-	return mcp.NewServerTool(
-		"find_implementations",
-		"Find all implementations of an interface or method at the specified position",
-		m.HandleFindImplementations,
-		mcp.Input(
-			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
-			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
-			mcp.Property("line", mcp.Description("Line number (1-based)"), mcp.Required(true)),
-			mcp.Property("character", mcp.Description("Character position (0-based)"), mcp.Required(true)),
-		),
-	)
-}
-
-// CreateFormatDocumentTool creates the format document MCP tool.
-func (m mcpTools) CreateFormatDocumentTool() *mcp.ServerTool {
-	return mcp.NewServerTool(
-		"format_document",
-		"Format a Go source file according to gofmt standards",
-		m.HandleFormatDocument,
-		mcp.Input(
-			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
-			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
-		),
-	)
-}
-
-// CreateOrganizeImportsTool creates the organize imports MCP tool.
-func (m mcpTools) CreateOrganizeImportsTool() *mcp.ServerTool {
-	return mcp.NewServerTool(
-		"organize_imports",
-		"Organize and clean up import statements in a Go file",
-		m.HandleOrganizeImports,
-		mcp.Input(
-			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
-			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
-		),
-	)
-}
-
-// CreateGetInlayHintsTool creates the get inlay hints MCP tool.
-func (m mcpTools) CreateGetInlayHintsTool() *mcp.ServerTool {
-	return mcp.NewServerTool(
-		"get_inlay_hints",
-		"Get inlay hints (implicit parameter names, type information) for a range in a Go file",
-		m.HandleGetInlayHints,
-		mcp.Input(
-			mcp.Property("workspace", mcp.Description("Workspace path to use for this request"), mcp.Required(true)),
-			mcp.Property("path", mcp.Description("Relative path to Go file (e.g., main.go, pkg/client.go)"), mcp.Required(true)),
-			mcp.Property("startLine", mcp.Description("Start line number (1-based)"), mcp.Required(true)),
-			mcp.Property("startChar", mcp.Description("Start character position (0-based)"), mcp.Required(true)),
-			mcp.Property("endLine", mcp.Description("End line number (1-based)"), mcp.Required(true)),
-			mcp.Property("endChar", mcp.Description("End character position (0-based)"), mcp.Required(true)),
-		),
-	)
-}
-
 // setupMCPServer creates and configures the MCP server with gopls tools.
 func setupMCPServer(clients map[string]*goplsClient) *mcp.Server {
 	// Create MCP server
-	server := mcp.NewServer("gopls-mcp", "v0.3.0", nil)
+	server := mcp.NewServer(&mcp.Implementation{Name: "gopls-mcp", Version: "v0.3.0"}, nil)
 
 	// Create MCP tools wrapper
 	tools := newMCPTools(clients)
 
-	// Add gopls tools
-	server.AddTools(
-		// Workspace management tools
-		tools.CreateListWorkspacesTool(),
+	// Add gopls tools using new v0.2.0 API
+	// Workspace management tools
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "list_workspaces",
+			Description: "List all available Go workspaces configured in the server",
+		},
+		tools.HandleListWorkspaces)
 
-		// Core navigation tools
-		tools.CreateGoToDefinitionTool(),
-		tools.CreateFindReferencesTool(),
-		tools.CreateGetHoverTool(),
+	// Core navigation tools
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "go_to_definition",
+			Description: "Navigate to the definition of a symbol at the specified position in a Go file",
+		},
+		tools.HandleGoToDefinition)
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "find_references",
+			Description: "Find all references to a symbol at the specified position in a Go file",
+		},
+		tools.HandleFindReferences)
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "get_hover_info",
+			Description: "Get hover information (documentation, type info) for a symbol at the specified position",
+		},
+		tools.HandleGetHover)
 
-		// Diagnostic and analysis tools
-		tools.CreateGetDiagnosticsTool(),
-		tools.CreateGetDocumentSymbolsTool(),
-		tools.CreateGetWorkspaceSymbolsTool(),
+	// Diagnostic and analysis tools
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "get_diagnostics",
+			Description: "Get compilation errors, warnings, and other diagnostics for a Go file",
+		},
+		tools.HandleGetDiagnostics)
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "get_document_symbols",
+			Description: "Get outline of symbols (functions, types, etc.) defined in a Go file",
+		},
+		tools.HandleGetDocumentSymbols)
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "get_workspace_symbols",
+			Description: "Search for symbols across the entire Go workspace/project",
+		},
+		tools.HandleGetWorkspaceSymbols)
 
-		// Code assistance tools
-		tools.CreateGetSignatureHelpTool(),
-		tools.CreateGetCompletionsTool(),
+	// Code assistance tools
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "get_signature_help",
+			Description: "Get function signature help (parameter information) at the specified position",
+		},
+		tools.HandleGetSignatureHelp)
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "get_completions",
+			Description: "Get code completion suggestions at the specified position",
+		},
+		tools.HandleGetCompletions)
 
-		// Advanced navigation tools
-		tools.CreateGetTypeDefinitionTool(),
-		tools.CreateFindImplementationsTool(),
+	// Advanced navigation tools
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "get_type_definition",
+			Description: "Navigate to the type definition of a symbol at the specified position",
+		},
+		tools.HandleGetTypeDefinition)
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "find_implementations",
+			Description: "Find all implementations of an interface or method at the specified position",
+		},
+		tools.HandleFindImplementations)
 
-		// Code maintenance tools
-		tools.CreateFormatDocumentTool(),
-		tools.CreateOrganizeImportsTool(),
-		tools.CreateGetInlayHintsTool(),
-	)
+	// Code maintenance tools
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "format_document",
+			Description: "Format a Go source file according to gofmt standards",
+		},
+		tools.HandleFormatDocument)
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "organize_imports",
+			Description: "Organize and clean up import statements in a Go file",
+		},
+		tools.HandleOrganizeImports)
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "get_inlay_hints",
+			Description: "Get inlay hints (implicit parameter names, type information) for a range in a Go file",
+		},
+		tools.HandleGetInlayHints)
 
 	return server
 }

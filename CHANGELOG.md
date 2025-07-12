@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Dependency Update**: Updated go-sdk from v0.1.0 to v0.2.0 with comprehensive API migration including server creation, tool registration patterns, and parameter schema definitions
 - **BREAKING**: Line numbering converted from 0-based to 1-based for all MCP tools to eliminate AI assistant off-by-one errors
 
 ## [v0.3.2] - 2025-07-10

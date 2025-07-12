@@ -126,30 +126,26 @@ func TestMCPToolsCreation(t *testing.T) {
 	clients := map[string]*goplsClient{workspacePath: client}
 	mcpToolsWrapper := newMCPTools(clients)
 
-	// Test tool creation
-	tools := []*mcp.ServerTool{
-		mcpToolsWrapper.CreateGoToDefinitionTool(),
-		mcpToolsWrapper.CreateFindReferencesTool(),
-		mcpToolsWrapper.CreateGetHoverTool(),
+	// Test that mcpTools wrapper was created successfully
+	if mcpToolsWrapper.clients == nil {
+		t.Error("Expected non-nil clients map in mcpTools wrapper")
 	}
 
-	for i, tool := range tools {
-		if tool == nil {
-			t.Errorf("Tool %d is nil", i)
-		}
+	if len(mcpToolsWrapper.clients) != 1 {
+		t.Errorf("Expected 1 client in map, got %d", len(mcpToolsWrapper.clients))
 	}
 
-	// Test that we can create an MCP server (this doesn't start it)
-	server := mcp.NewServer("gopls-mcp", "v0.1.0", nil)
+	// Test that we can create an MCP server with new v0.2.0 API
+	server := mcp.NewServer(&mcp.Implementation{Name: "gopls-mcp", Version: "v0.3.0"}, nil)
 	if server == nil {
 		t.Error("Expected non-nil MCP server")
 	}
 
-	// Test adding tools to server
-	server.AddTools(tools...)
+	// Test adding a tool to server with new API
+	mcp.AddTool(server, &mcp.Tool{Name: "test_tool", Description: "Test tool"}, mcpToolsWrapper.HandleGoToDefinition)
 }
 func TestMCPServerCreation(t *testing.T) {
-	server := mcp.NewServer("gopls-mcp", "v0.1.0", nil)
+	server := mcp.NewServer(&mcp.Implementation{Name: "gopls-mcp", Version: "v0.3.0"}, nil)
 	if server == nil {
 		t.Error("Expected non-nil MCP server")
 	}
